@@ -20,6 +20,88 @@
     return module.default || module.siteSelectors;
   }
 
+  function isYouTubeShortsPage() {
+    try {
+      const p = window.location.pathname || '';
+      return /^\/shorts\//.test(p);
+    } catch (_) { return false; }
+  }
+
+  function getYouTubeShortsTitle() {
+    // Prefer LD+JSON VideoObject.name
+    try {
+      const scripts = Array.from(document.querySelectorAll('script[type="application/ld+json"]'));
+      for (const s of scripts) {
+        try {
+          const data = JSON.parse(s.textContent || 'null');
+          const items = Array.isArray(data) ? data : [data];
+          for (const it of items) {
+            if (it && (it['@type'] === 'VideoObject' || (Array.isArray(it['@type']) && it['@type'].includes('VideoObject'))) && typeof it.name === 'string') {
+              const t = normaliseText(it.name, 200);
+              if (t) return t;
+            }
+          }
+        } catch (_) { }
+      }
+    } catch (_) { }
+    // Fallback to overlay title nodes
+    const sel = [
+      '#reel-player-overlay-renderer #title yt-formatted-string',
+      'ytd-reel-player-overlay-renderer #title yt-formatted-string',
+      '#reel-player-overlay-renderer #title',
+      'ytd-reel-player-overlay-renderer #title',
+      '#shorts-title',
+      'ytd-reel-video-renderer #shorts-title'
+    ];
+    for (const s of sel) {
+      const el = document.querySelector(s);
+      if (el && (el.innerText || el.textContent)) {
+        const t = normaliseText(el.innerText || el.textContent, 200);
+        if (t) return t;
+      }
+    }
+    return normaliseText(document.title || '', 200);
+  }
+
+  function getYouTubeShortsDescription() {
+    // Prefer LD+JSON VideoObject.description
+    try {
+      const scripts = Array.from(document.querySelectorAll('script[type="application/ld+json"]'));
+      for (const s of scripts) {
+        try {
+          const data = JSON.parse(s.textContent || 'null');
+          const items = Array.isArray(data) ? data : [data];
+          for (const it of items) {
+            if (it && (it['@type'] === 'VideoObject' || (Array.isArray(it['@type']) && it['@type'].includes('VideoObject'))) && typeof it.description === 'string') {
+              const d = normaliseText(it.description, 4000);
+              if (d) return d;
+            }
+          }
+        } catch (_) { }
+      }
+    } catch (_) { }
+    // Fallback to overlay text content (caption/description snippet)
+    const sel = [
+      '#reel-player-overlay-renderer ytd-reel-player-overlay-renderer yt-core-attributed-string',
+      'ytd-reel-player-overlay-renderer yt-core-attributed-string',
+      '#reel-player-overlay-renderer',
+      'ytd-reel-player-overlay-renderer'
+    ];
+    for (const s of sel) {
+      const el = document.querySelector(s);
+      if (el && el.innerText) {
+        const t = normaliseText(el.innerText, 1000);
+        if (t) return t;
+      }
+    }
+    // Meta description fallback
+    try {
+      const meta = document.querySelector('meta[name="description"]');
+      if (meta && meta.content) return normaliseText(meta.content, 1000);
+    } catch (_) {}
+    return '';
+  }
+
   /**
    * Wait briefly to allow the DOM to reflect a toggle state after a click.
    */
@@ -368,9 +450,26 @@
    * @returns {string} The determined URL to save.
    */
   function extractLink(button, containerSelectors) {
-    // Special handling for Twitter/X: prefer the tweet's canonical permalink
+    // Special handling for certain sites to build canonical permalinks
     try {
       const host = window.location.hostname.replace(/^www\./, '');
+      // YouTube: construct a stable permalink from current location to avoid stale DOM/canonical during SPA transitions
+      if (host === 'youtube.com') {
+        try {
+          const loc = new URL(window.location.href);
+          const path = loc.pathname || '';
+          // Shorts URL
+          const shortsMatch = path.match(/^\/shorts\/([a-zA-Z0-9_-]{8,})/);
+          if (shortsMatch && shortsMatch[1]) {
+            return `${loc.origin}/shorts/${shortsMatch[1]}`;
+          }
+          // Watch URL with v param
+          const v = loc.searchParams.get('v');
+          if (path.startsWith('/watch') && v) {
+            return `${loc.origin}/watch?v=${encodeURIComponent(v)}`;
+          }
+        } catch (_) { /* ignore and fallback below */ }
+      }
       if (host === 'twitter.com' || host === 'x.com') {
         const article = button.closest('article') || document.querySelector('article');
         if (article) {
@@ -494,19 +593,28 @@
       }
     } else if (host === 'youtube.com') {
       // Prefer the actual video description rather than random sidebar text.
-      title = getYouTubeTitle();
-      // Read whatever is currently available; if too short, force expansion and re-read.
-      let desc = getYouTubeDescription();
-      if (!desc || desc.length < 400) {
-        try {
-          await ensureYouTubeDescriptionExpanded();
-          // Give the DOM a moment to populate the expanded content
-          await new Promise(r => setTimeout(r, 120));
-          desc = getYouTubeDescription();
-        } catch (_) { /* ignore */ }
-      }
-      if (desc) {
-        excerpt = desc;
+      if (isYouTubeShortsPage()) {
+        // Shorts: use dedicated extractors
+        title = getYouTubeShortsTitle();
+        let desc = getYouTubeShortsDescription();
+        if (desc) {
+          excerpt = desc;
+        }
+      } else {
+        title = getYouTubeTitle();
+        // Read whatever is currently available; if too short, force expansion and re-read.
+        let desc = getYouTubeDescription();
+        if (!desc || desc.length < 400) {
+          try {
+            await ensureYouTubeDescriptionExpanded();
+            // Give the DOM a moment to populate the expanded content
+            await new Promise(r => setTimeout(r, 120));
+            desc = getYouTubeDescription();
+          } catch (_) { /* ignore */ }
+        }
+        if (desc) {
+          excerpt = desc;
+        }
       }
     }
     // Generic fallback if excerpt still empty
