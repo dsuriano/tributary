@@ -123,6 +123,47 @@
    * @returns {string} The determined URL to save.
    */
   function extractLink(button, containerSelectors) {
+    // Special handling for Twitter/X: prefer the tweet's canonical permalink
+    try {
+      const host = window.location.hostname.replace(/^www\./, '');
+      if (host === 'twitter.com' || host === 'x.com') {
+        const article = button.closest('article') || document.querySelector('article');
+        if (article) {
+          // The time/link to the tweet typically uses a relative href with /status/<id>
+          const statusAnchors = article.querySelectorAll('a[href*="/status/"]');
+          // Choose the last anchor which usually points to the tweet timestamp/permalink
+          const anchor = statusAnchors[statusAnchors.length - 1];
+          if (anchor) {
+            const href = anchor.getAttribute('href') || '';
+            // Build absolute URL against current origin (x.com or twitter.com)
+            const url = new URL(href, window.location.origin);
+            // Normalize to end with /status/<id>
+            try {
+              const parts = url.pathname.split('/').filter(Boolean);
+              const statusIdx = parts.indexOf('status');
+              if (statusIdx !== -1 && parts[statusIdx + 1]) {
+                const id = parts[statusIdx + 1];
+                // If a username exists before 'status', preserve it
+                const username = statusIdx > 0 ? parts[statusIdx - 1] : null;
+                let normalizedPath = '';
+                if (username) {
+                  normalizedPath = `/${username}/status/${id}`;
+                } else {
+                  // Fallback if username is missing (e.g., /i/web/status/<id>)
+                  normalizedPath = `/status/${id}`;
+                }
+                url.pathname = normalizedPath;
+                url.hash = '';
+                url.search = '';
+              }
+            } catch (_) { /* ignore */ }
+            return url.href;
+          }
+        }
+      }
+    } catch (e) {
+      // If any error occurs, fall back to generic extraction below
+    }
     let container = null;
     if (Array.isArray(containerSelectors)) {
       for (const sel of containerSelectors) {
@@ -181,12 +222,33 @@
     }
     // Provide immediate feedback
     showToast('Saving to Raindrop.io…');
-    const title = document.title || '';
-    // Extract a brief excerpt: text content of the container trimmed to 500 characters.
+    let title = document.title || '';
+    // Extract a brief excerpt. For Twitter/X, prefer the tweet text within the article.
     let excerpt = '';
-    const container = button.closest(containerSelectors && containerSelectors[0] || '') || document;
-    if (container && container.textContent) {
-      excerpt = container.textContent.trim().substring(0, 500);
+    const host = window.location.hostname.replace(/^www\./, '');
+    if (host === 'twitter.com' || host === 'x.com') {
+      const article = button.closest('article') || document.querySelector('article');
+      if (article) {
+        // Gather all tweet text nodes (tweets can be split into multiple nodes)
+        const textNodes = article.querySelectorAll('[data-testid="tweetText"]');
+        let combined = '';
+        textNodes.forEach((n) => {
+          combined += (n.innerText || n.textContent || '').trim() + ' ';
+        });
+        combined = combined.trim();
+        if (combined) {
+          excerpt = combined.substring(0, 500);
+          // Use the first portion of the tweet as the title for better readability
+          title = combined.substring(0, 80);
+        }
+      }
+    }
+    // Generic fallback if excerpt still empty
+    if (!excerpt) {
+      const container = button.closest((containerSelectors && containerSelectors[0]) || '') || document;
+      if (container && container.textContent) {
+        excerpt = container.textContent.trim().substring(0, 500);
+      }
     }
     chrome.runtime.sendMessage({
       action: 'save',
