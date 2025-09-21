@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Social Media to Raindrop.io Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Raindrop.io Bookmark Settings</h1>
+
+    <section class="section">
+      <h2>API Token</h2>
+      <p>Enter your Raindrop.io API <em>test token</em>. This token is stored locally
+        and used solely to create bookmarks on your behalf. You can generate
+        a test token on your Raindrop.io account page.</p>
+      <div class="field">
+        <label for="token">API Token:</label>
+        <input type="password" id="token" placeholder="Your API token" />
+        <span id="token-status" class="status">Not connected</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Default Collection &amp; Tags</h2>
+      <p>Select a default collection (folder) and optionally enter default
+        tags to apply to all bookmarks created by this extension.</p>
+      <div class="field">
+        <label for="collection">Default collection:</label>
+        <select id="collection">
+          <option value="">-- select collection --</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="tags">Default tags:</label>
+        <input type="text" id="tags" placeholder="e.g. social, bookmark" />
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Enabled Domains</h2>
+      <p>Choose which websites the extension should operate on. If a domain is
+        disabled the content script will not run on that site.</p>
+      <div id="domains"></div>
+    </section>
+
+    <div class="actions">
+      <button id="save">Save settings</button>
+    </div>
+    <p class="note">Changes take effect immediately after saving.</p>
+  </div>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>
