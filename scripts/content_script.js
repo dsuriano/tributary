@@ -21,6 +21,201 @@
   }
 
   /**
+   * Small utility to wait for a condition with polling.
+   * Returns a promise that resolves true if condition met within timeout, else false.
+   */
+  function waitForCondition(predicate, { timeout = 1500, interval = 50 } = {}) {
+    return new Promise((resolve) => {
+      const start = Date.now();
+      const timer = setInterval(() => {
+        let ok = false;
+        try { ok = !!predicate(); } catch (_) { ok = false; }
+        if (ok) {
+          clearInterval(timer);
+          resolve(true);
+          return;
+        }
+        if (Date.now() - start >= timeout) {
+          clearInterval(timer);
+          resolve(false);
+        }
+      }, interval);
+    });
+  }
+
+  /**
+   * Normalise whitespace in extracted text.
+   * Collapses multiple spaces and trims leading/trailing whitespace.
+   * Limits to a max length if provided.
+   */
+  function normaliseText(text, maxLen = 0) {
+    if (!text) return '';
+    let t = String(text).replace(/\s+/g, ' ').trim();
+    if (maxLen > 0 && t.length > maxLen) {
+      t = t.slice(0, maxLen);
+    }
+    return t;
+  }
+
+  /**
+   * YouTube helpers: extract title and description from the watch page.
+   * These aim to be resilient to DOM changes by checking several selectors
+   * and falling back to meta tags.
+   */
+  function getYouTubeTitle() {
+    try {
+      const titleEl = document.querySelector('ytd-watch-metadata h1 yt-formatted-string')
+        || document.querySelector('ytd-watch-metadata h1')
+        || document.querySelector('h1.title')
+        || document.querySelector('meta[name="title"]');
+      if (titleEl) {
+        const raw = titleEl.getAttribute && titleEl.getAttribute('content') ? titleEl.getAttribute('content') : (titleEl.textContent || '');
+        return normaliseText(raw, 200);
+      }
+    } catch (_) {}
+    return normaliseText(document.title || '', 200);
+  }
+
+  function getYouTubeExpanderRoot() {
+    return document.querySelector('ytd-watch-metadata ytd-text-inline-expander')
+      || document.querySelector('#description-inline-expander');
+  }
+
+  function clickYouTubeDescriptionExpand() {
+    try {
+      const root = getYouTubeExpanderRoot();
+      const candidates = [
+        '#expand',
+        'tp-yt-paper-button#expand',
+        'tp-yt-paper-button[aria-label*="more" i]',
+        'button[aria-label*="more" i]'
+      ];
+      let btn = null;
+      for (const sel of candidates) {
+        const el = root ? root.querySelector(sel) : document.querySelector(sel);
+        if (el && !el.hasAttribute('hidden')) { btn = el; break; }
+      }
+      if (!btn) return false;
+      const cs = window.getComputedStyle(btn);
+      if (cs && (cs.display === 'none' || cs.visibility === 'hidden')) return false;
+      if (btn.getAttribute('aria-disabled') === 'true') return false;
+      try { (root || btn).scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' }); } catch (_) {}
+      // Simulate pointer + mouse click sequences
+      const events = [
+        new PointerEvent('pointerdown', { bubbles: true, cancelable: true, composed: true }),
+        new MouseEvent('mousedown', { bubbles: true, cancelable: true, composed: true }),
+        new PointerEvent('pointerup', { bubbles: true, cancelable: true, composed: true }),
+        new MouseEvent('mouseup', { bubbles: true, cancelable: true, composed: true }),
+        new MouseEvent('click', { bubbles: true, cancelable: true, composed: true })
+      ];
+      for (const e of events) {
+        try { btn.dispatchEvent(e); } catch (_) {}
+      }
+      try { btn.click(); } catch (_) {}
+      return true;
+    } catch (_) {}
+    return false;
+  }
+
+  function isYouTubeDescriptionExpanded() {
+    try {
+      const root = getYouTubeExpanderRoot();
+      if (!root) return false;
+      // Attribute or collapse button indicate expanded state
+      if (root.hasAttribute('is-expanded')) return true;
+      const collapseBtn = root.querySelector('tp-yt-paper-button#collapse, #collapse');
+      if (collapseBtn) return true;
+      // Some layouts reveal a div#expanded when opened
+      const expandedEl = root.querySelector('#expanded');
+      if (expandedEl) {
+        const st = window.getComputedStyle(expandedEl);
+        if (st && st.display !== 'none' && st.visibility !== 'hidden' && st.height !== '0px') return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  async function ensureYouTubeDescriptionExpanded() {
+    if (isYouTubeDescriptionExpanded()) return true;
+    // Wait for expander root to exist on SPA navigations
+    await waitForCondition(() => !!getYouTubeExpanderRoot(), { timeout: 3000, interval: 80 });
+    clickYouTubeDescriptionExpand();
+    // Wait for visual expanded state or increased content
+    let baselineLen = 0;
+    try {
+      const root = getYouTubeExpanderRoot();
+      baselineLen = root ? (root.innerText || '').length : 0;
+    } catch (_) {}
+    let expanded = await waitForCondition(() => {
+      if (isYouTubeDescriptionExpanded()) return true;
+      try {
+        const root = getYouTubeExpanderRoot();
+        if (!root) return false;
+        const len = (root.innerText || '').length;
+        return len > baselineLen + 40; // significant growth
+      } catch (_) { return false; }
+    }, { timeout: 5000, interval: 80 });
+    if (!expanded) {
+      // Try one more click after a small delay
+      await new Promise(r => setTimeout(r, 150));
+      clickYouTubeDescriptionExpand();
+      expanded = await waitForCondition(() => isYouTubeDescriptionExpanded(), { timeout: 3500, interval: 80 });
+    }
+    return expanded;
+  }
+
+  function getYouTubeDescription() {
+    // 1) Prefer structured data JSON to avoid UI interaction and ensure full text
+    try {
+      const scripts = Array.from(document.querySelectorAll('script[type="application/ld+json"]'));
+      for (const s of scripts) {
+        try {
+          const data = JSON.parse(s.textContent || 'null');
+          const items = Array.isArray(data) ? data : [data];
+          for (const it of items) {
+            if (it && (it['@type'] === 'VideoObject' || (Array.isArray(it['@type']) && it['@type'].includes('VideoObject'))) && typeof it.description === 'string') {
+              const desc = normaliseText(it.description, 5000);
+              if (desc) return desc;
+            }
+          }
+        } catch (_) { /* ignore single script parse errors */ }
+      }
+    } catch (_) { /* ignore */ }
+
+    // 2) Fallback to DOM-based selectors (expanded if possible)
+    const trySelectors = [
+      // New watch page inline expander
+      'ytd-watch-metadata #description-inline-expander #expanded',
+      'ytd-watch-metadata #description-inline-expander',
+      // Generic text inline expander
+      'ytd-watch-metadata ytd-text-inline-expander #expanded',
+      'ytd-watch-metadata ytd-text-inline-expander',
+      // Older description container
+      '#description',
+      // Fallbacks
+      'ytd-expander#description',
+    ];
+    for (const sel of trySelectors) {
+      try {
+        const el = document.querySelector(sel);
+        if (el && el.innerText) {
+          const text = el.innerText.replace(/^(Show more|More)\s*/i, '');
+          const normalised = normaliseText(text, 2000);
+          if (normalised) return normalised;
+        }
+      } catch (_) { /* ignore */ }
+    }
+    // Meta description as a conservative fallback
+    try {
+      const meta = document.querySelector('meta[name="description"]');
+      if (meta && meta.content) {
+        return normaliseText(meta.content, 1000);
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  /**
    * Build a toast container if it doesn't already exist.
    */
   function ensureToastContainer() {
@@ -214,7 +409,7 @@
    * @param {Element} button The button that was clicked.
    * @param {string[]} containerSelectors List of container selectors for the site.
    */
-  function processClick(button, containerSelectors) {
+  async function processClick(button, containerSelectors) {
     const url = extractLink(button, containerSelectors);
     if (!url) {
       showToast('Error: Unable to extract link.', false);
@@ -223,7 +418,7 @@
     // Provide immediate feedback
     showToast('Saving to Raindrop.io…');
     let title = document.title || '';
-    // Extract a brief excerpt. For Twitter/X, prefer the tweet text within the article.
+    // Extract a brief excerpt. For Twitter/X and YouTube, use site-specific logic.
     let excerpt = '';
     const host = window.location.hostname.replace(/^www\./, '');
     if (host === 'twitter.com' || host === 'x.com') {
@@ -241,6 +436,22 @@
           // Use the first portion of the tweet as the title for better readability
           title = combined.substring(0, 80);
         }
+      }
+    } else if (host === 'youtube.com') {
+      // Prefer the actual video description rather than random sidebar text.
+      title = getYouTubeTitle();
+      // Read whatever is currently available; if too short, force expansion and re-read.
+      let desc = getYouTubeDescription();
+      if (!desc || desc.length < 400) {
+        try {
+          await ensureYouTubeDescriptionExpanded();
+          // Give the DOM a moment to populate the expanded content
+          await new Promise(r => setTimeout(r, 120));
+          desc = getYouTubeDescription();
+        } catch (_) { /* ignore */ }
+      }
+      if (desc) {
+        excerpt = desc;
       }
     }
     // Generic fallback if excerpt still empty

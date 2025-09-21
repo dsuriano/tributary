@@ -56,7 +56,7 @@ async function raindropFetch(endpoint, options = {}, token) {
  * @param {chrome.tabs.Tab} tab Tab from which the request originated.
  */
 async function handleSave(data, tab) {
-  const { raindropToken, defaultCollection, defaultTags } = await getStorage(['raindropToken', 'defaultCollection', 'defaultTags']);
+  const { raindropToken, defaultCollection, defaultTags, debugLogging } = await getStorage(['raindropToken', 'defaultCollection', 'defaultTags', 'debugLogging']);
   if (!raindropToken) {
     chrome.tabs.sendMessage(tab.id, { type: 'saveResult', status: 'error', error: 'API token not set.' });
     return;
@@ -70,8 +70,7 @@ async function handleSave(data, tab) {
   const body = {
     link: data.url,
     title: data.title || '',
-    excerpt: data.excerpt || '',
-    pleaseParse: {}
+    excerpt: data.excerpt || ''
   };
   if (defaultTags && Array.isArray(defaultTags) && defaultTags.length > 0) {
     body.tags = defaultTags;
@@ -80,11 +79,17 @@ async function handleSave(data, tab) {
     body.collection = { $id: defaultCollection };
   }
   try {
+    if (debugLogging) {
+      console.debug('[Raindrop BG] Saving raindrop', { link: body.link, titleLen: body.title.length, excerptLen: body.excerpt.length, tags: body.tags, collection: body.collection });
+    }
     const response = await raindropFetch('/raindrop', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     }, raindropToken);
+    if (debugLogging) {
+      console.debug('[Raindrop BG] Save response status', response.status);
+    }
     if (response.status === 429) {
       // Too many requests – apply backoff
       backoffUntil = Date.now() + 60 * 1000;
