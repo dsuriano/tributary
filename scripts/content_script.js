@@ -21,6 +21,56 @@
   }
 
   /**
+   * Wait briefly to allow the DOM to reflect a toggle state after a click.
+   */
+  function wait(ms = 60) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Determine if the clicked control is transitioning to the positive state.
+   * We only save when moving from neutral -> liked/upvoted, not when unliking.
+   * Uses aria attributes where available.
+   */
+  async function isToggledOnAfterClick(host, button) {
+    // Give the UI a brief moment to update its aria-* attributes
+    await wait(80);
+    const inContainer = (root) => {
+      if (!root) return false;
+      return !!root.querySelector('[aria-pressed="true"], [aria-checked="true"], [aria-selected="true"], .style-default-active');
+    };
+    const hasPressed = (el) => {
+      if (!el) return false;
+      const ap = el.getAttribute('aria-pressed');
+      const ac = el.getAttribute('aria-checked');
+      const as = el.getAttribute('aria-selected');
+      const cls = el.className || '';
+      return ap === 'true' || ac === 'true' || as === 'true' || (typeof cls === 'string' && cls.includes('style-default-active'));
+    };
+    try {
+      if (host === 'youtube.com') {
+        const toggleRoot = button.closest('ytd-toggle-button-renderer') || button.closest('#like-button') || button;
+        // Prefer the inner <button>
+        const innerBtn = toggleRoot.querySelector('button') || toggleRoot;
+        return hasPressed(innerBtn) || inContainer(toggleRoot);
+      }
+      if (host === 'twitter.com' || host === 'x.com') {
+        // Twitter like button uses aria-pressed
+        const innerBtn = button.closest('[data-testid="like"]') || button;
+        return hasPressed(innerBtn);
+      }
+      if (host === 'reddit.com') {
+        const innerBtn = button.closest('button[aria-label="upvote"]') || button;
+        return hasPressed(innerBtn);
+      }
+      // Generic fallback
+      return hasPressed(button) || inContainer(button.closest('*'));
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /**
    * Small utility to wait for a condition with polling.
    * Returns a promise that resolves true if condition met within timeout, else false.
    */
@@ -410,6 +460,12 @@
    * @param {string[]} containerSelectors List of container selectors for the site.
    */
   async function processClick(button, containerSelectors) {
+    const host = window.location.hostname.replace(/^www\./, '');
+    // Only proceed if the click resulted in toggled ON state (like/upvote on)
+    const toggledOn = await isToggledOnAfterClick(host, button);
+    if (!toggledOn) {
+      return; // ignore neutral->off or on->off transitions
+    }
     const url = extractLink(button, containerSelectors);
     if (!url) {
       showToast('Error: Unable to extract link.', false);
@@ -420,7 +476,6 @@
     let title = document.title || '';
     // Extract a brief excerpt. For Twitter/X and YouTube, use site-specific logic.
     let excerpt = '';
-    const host = window.location.hostname.replace(/^www\./, '');
     if (host === 'twitter.com' || host === 'x.com') {
       const article = button.closest('article') || document.querySelector('article');
       if (article) {
