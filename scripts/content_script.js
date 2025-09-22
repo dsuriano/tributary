@@ -576,17 +576,15 @@
       if (DEBUG) console.debug('[Raindrop CS] Click ignored (toggle not ON)');
       return; // ignore neutral->off or on->off transitions
     }
-    // Additional protection for Reddit: require rising edge (prev OFF -> now ON)
-    if (host === 'reddit.com') {
-      try {
-        const prev = preClickOnState.get(button);
-        preClickOnState.delete(button);
-        if (prev === true) {
-          if (DEBUG) console.debug('[Raindrop CS] Ignoring un-upvote (was ON before click)');
-          return;
-        }
-      } catch (_) { /* ignore */ }
-    }
+    // Additional protection for all hosts: require rising edge (prev OFF -> now ON)
+    try {
+      const prev = preClickOnState.get(button);
+      preClickOnState.delete(button);
+      if (prev === true) {
+        if (DEBUG) console.debug('[Raindrop CS] Ignoring toggle-off (was ON before click)');
+        return;
+      }
+    } catch (_) { /* ignore */ }
     const url = computePermalink(button, siteConfig);
     // Deduplicate by URL to avoid double saves from multiple detectors
     try {
