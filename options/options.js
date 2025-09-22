@@ -22,7 +22,7 @@ async function loadSiteSelectors() {
 async function init() {
   // Get stored settings
   const stored = await new Promise((resolve) => {
-    chrome.storage.local.get(['raindropToken', 'defaultCollection', 'defaultTags', 'enabledDomains'], resolve);
+    chrome.storage.local.get(['raindropToken', 'defaultCollection', 'defaultTags', 'enabledDomains', 'debugLogging'], resolve);
   });
   const tokenInput = document.getElementById('token');
   const tokenStatus = document.getElementById('token-status');
@@ -30,9 +30,11 @@ async function init() {
   const tagsInput = document.getElementById('tags');
   const domainsContainer = document.getElementById('domains');
   const saveButton = document.getElementById('save');
+  const debugCheckbox = document.getElementById('debugLogging');
 
   tokenInput.value = stored.raindropToken || '';
   tagsInput.value = Array.isArray(stored.defaultTags) ? stored.defaultTags.join(', ') : '';
+  debugCheckbox.checked = !!stored.debugLogging;
   // Build domain checkboxes
   const selectors = await loadSiteSelectors();
   const enabled = stored.enabledDomains || {};
@@ -77,7 +79,8 @@ async function init() {
       raindropToken: token,
       defaultCollection: defaultCollection,
       defaultTags: tags,
-      enabledDomains: enabledDomains
+      enabledDomains: enabledDomains,
+      debugLogging: !!debugCheckbox.checked
     }, () => {
       // After saving, validate token and update collections
       if (token) {

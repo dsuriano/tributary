@@ -10,6 +10,7 @@
 (() => {
   const DEBOUNCE_DELAY = 500; // milliseconds
   let lastClickTime = 0;
+  let DEBUG = false;
 
   /**
    * Load the site selector configuration from the extension package.
@@ -450,64 +451,6 @@
    * @returns {string} The determined URL to save.
    */
   function extractLink(button, containerSelectors) {
-    // Special handling for certain sites to build canonical permalinks
-    try {
-      const host = window.location.hostname.replace(/^www\./, '');
-      // YouTube: construct a stable permalink from current location to avoid stale DOM/canonical during SPA transitions
-      if (host === 'youtube.com') {
-        try {
-          const loc = new URL(window.location.href);
-          const path = loc.pathname || '';
-          // Shorts URL
-          const shortsMatch = path.match(/^\/shorts\/([a-zA-Z0-9_-]{8,})/);
-          if (shortsMatch && shortsMatch[1]) {
-            return `${loc.origin}/shorts/${shortsMatch[1]}`;
-          }
-          // Watch URL with v param
-          const v = loc.searchParams.get('v');
-          if (path.startsWith('/watch') && v) {
-            return `${loc.origin}/watch?v=${encodeURIComponent(v)}`;
-          }
-        } catch (_) { /* ignore and fallback below */ }
-      }
-      if (host === 'twitter.com' || host === 'x.com') {
-        const article = button.closest('article') || document.querySelector('article');
-        if (article) {
-          // The time/link to the tweet typically uses a relative href with /status/<id>
-          const statusAnchors = article.querySelectorAll('a[href*="/status/"]');
-          // Choose the last anchor which usually points to the tweet timestamp/permalink
-          const anchor = statusAnchors[statusAnchors.length - 1];
-          if (anchor) {
-            const href = anchor.getAttribute('href') || '';
-            // Build absolute URL against current origin (x.com or twitter.com)
-            const url = new URL(href, window.location.origin);
-            // Normalize to end with /status/<id>
-            try {
-              const parts = url.pathname.split('/').filter(Boolean);
-              const statusIdx = parts.indexOf('status');
-              if (statusIdx !== -1 && parts[statusIdx + 1]) {
-                const id = parts[statusIdx + 1];
-                // If a username exists before 'status', preserve it
-                const username = statusIdx > 0 ? parts[statusIdx - 1] : null;
-                let normalizedPath = '';
-                if (username) {
-                  normalizedPath = `/${username}/status/${id}`;
-                } else {
-                  // Fallback if username is missing (e.g., /i/web/status/<id>)
-                  normalizedPath = `/status/${id}`;
-                }
-                url.pathname = normalizedPath;
-                url.hash = '';
-                url.search = '';
-              }
-            } catch (_) { /* ignore */ }
-            return url.href;
-          }
-        }
-      }
-    } catch (e) {
-      // If any error occurs, fall back to generic extraction below
-    }
     let container = null;
     if (Array.isArray(containerSelectors)) {
       for (const sel of containerSelectors) {
@@ -550,6 +493,27 @@
   }
 
   /**
+   * Compute permalink using a site-specific hook if provided; otherwise
+   * fall back to the generic extractLink().
+   * @param {Element} button
+   * @param {object} siteConfig
+   * @returns {string}
+   */
+  function computePermalink(button, siteConfig) {
+    try {
+      const hooks = (siteConfig && siteConfig.hooks) || {};
+      if (hooks && typeof hooks.getPermalink === 'function') {
+        const v = hooks.getPermalink(button);
+        if (typeof v === 'string' && v) return v;
+      }
+    } catch (_) { /* ignore and fallback */ }
+    const containerSelectors = Array.isArray(siteConfig?.containerSelector)
+      ? siteConfig.containerSelector
+      : [siteConfig?.containerSelector].filter(Boolean);
+    return extractLink(button, containerSelectors);
+  }
+
+  /**
    * Handle a valid button click: extract the link and send it to the
    * background script. A neutral toast is displayed while the network
    * request is performed. The final outcome is handled by a listener
@@ -558,14 +522,33 @@
    * @param {Element} button The button that was clicked.
    * @param {string[]} containerSelectors List of container selectors for the site.
    */
-  async function processClick(button, containerSelectors) {
+  async function processClick(button, siteConfig) {
     const host = window.location.hostname.replace(/^www\./, '');
     // Only proceed if the click resulted in toggled ON state (like/upvote on)
-    const toggledOn = await isToggledOnAfterClick(host, button);
+    let toggledOn = false;
+    try {
+      const hooks = (siteConfig && siteConfig.hooks) || {};
+      if (hooks && typeof hooks.toggledOnAfterClick === 'function') {
+        const hookResult = !!(await hooks.toggledOnAfterClick(button));
+        if (hookResult) {
+          toggledOn = true;
+          if (DEBUG) console.debug('[Raindrop CS] Hook toggle detection: ON');
+        } else {
+          // Fallback to generic detector when hook returns false
+          toggledOn = await isToggledOnAfterClick(host, button);
+          if (DEBUG) console.debug('[Raindrop CS] Hook false, generic toggle=', toggledOn);
+        }
+      } else {
+        toggledOn = await isToggledOnAfterClick(host, button);
+      }
+    } catch (_) {
+      toggledOn = await isToggledOnAfterClick(host, button);
+    }
     if (!toggledOn) {
+      if (DEBUG) console.debug('[Raindrop CS] Click ignored (toggle not ON)');
       return; // ignore neutral->off or on->off transitions
     }
-    const url = extractLink(button, containerSelectors);
+    const url = computePermalink(button, siteConfig);
     if (!url) {
       showToast('Error: Unable to extract link.', false);
       return;
@@ -575,55 +558,66 @@
     let title = document.title || '';
     // Extract a brief excerpt. For Twitter/X and YouTube, use site-specific logic.
     let excerpt = '';
-    if (host === 'twitter.com' || host === 'x.com') {
-      const article = button.closest('article') || document.querySelector('article');
-      if (article) {
-        // Gather all tweet text nodes (tweets can be split into multiple nodes)
-        const textNodes = article.querySelectorAll('[data-testid="tweetText"]');
-        let combined = '';
-        textNodes.forEach((n) => {
-          combined += (n.innerText || n.textContent || '').trim() + ' ';
-        });
-        combined = combined.trim();
-        if (combined) {
-          excerpt = combined.substring(0, 500);
-          // Use the first portion of the tweet as the title for better readability
-          title = combined.substring(0, 80);
-        }
+    try {
+      const hooks = (siteConfig && siteConfig.hooks) || {};
+      if (hooks && typeof hooks.getTitle === 'function') {
+        const t = hooks.getTitle(button);
+        if (typeof t === 'string' && t) title = t;
       }
-    } else if (host === 'youtube.com') {
-      // Prefer the actual video description rather than random sidebar text.
-      if (isYouTubeShortsPage()) {
-        // Shorts: use dedicated extractors
-        title = getYouTubeShortsTitle();
-        let desc = getYouTubeShortsDescription();
-        if (desc) {
-          excerpt = desc;
+      if (hooks && typeof hooks.getExcerpt === 'function') {
+        const e = hooks.getExcerpt(button);
+        if (typeof e === 'string' && e) excerpt = e;
+      }
+    } catch (_) { /* ignore hook errors and fall back */ }
+    if (!excerpt) {
+      if (host === 'twitter.com' || host === 'x.com') {
+        const article = button.closest('article') || document.querySelector('article');
+        if (article) {
+          const textNodes = article.querySelectorAll('[data-testid="tweetText"]');
+          let combined = '';
+          textNodes.forEach((n) => {
+            combined += (n.innerText || n.textContent || '').trim() + ' ';
+          });
+          combined = combined.trim();
+          if (combined) {
+            excerpt = combined.substring(0, 500);
+            title = title || combined.substring(0, 80);
+          }
         }
-      } else {
-        title = getYouTubeTitle();
-        // Read whatever is currently available; if too short, force expansion and re-read.
-        let desc = getYouTubeDescription();
-        if (!desc || desc.length < 400) {
-          try {
-            await ensureYouTubeDescriptionExpanded();
-            // Give the DOM a moment to populate the expanded content
-            await new Promise(r => setTimeout(r, 120));
-            desc = getYouTubeDescription();
-          } catch (_) { /* ignore */ }
-        }
-        if (desc) {
-          excerpt = desc;
+      } else if (host === 'youtube.com') {
+        if (isYouTubeShortsPage()) {
+          title = title || getYouTubeShortsTitle();
+          let desc = getYouTubeShortsDescription();
+          if (desc) {
+            excerpt = desc;
+          }
+        } else {
+          title = title || getYouTubeTitle();
+          let desc = getYouTubeDescription();
+          if (!desc || desc.length < 400) {
+            try {
+              await ensureYouTubeDescriptionExpanded();
+              await new Promise(r => setTimeout(r, 120));
+              desc = getYouTubeDescription();
+            } catch (_) { /* ignore */ }
+          }
+          if (desc) {
+            excerpt = desc;
+          }
         }
       }
     }
     // Generic fallback if excerpt still empty
     if (!excerpt) {
+      const containerSelectors = Array.isArray(siteConfig?.containerSelector)
+        ? siteConfig.containerSelector
+        : [siteConfig?.containerSelector].filter(Boolean);
       const container = button.closest((containerSelectors && containerSelectors[0]) || '') || document;
       if (container && container.textContent) {
         excerpt = container.textContent.trim().substring(0, 500);
       }
     }
+    if (DEBUG) console.debug('[Raindrop CS] Saving', { url, titleLen: (title||'').length, excerptLen: (excerpt||'').length });
     chrome.runtime.sendMessage({
       action: 'save',
       data: {
@@ -647,14 +641,15 @@
       return; // unsupported site
     }
     // Retrieve enablement settings
-    chrome.storage.local.get(['enabledDomains'], (result) => {
+    chrome.storage.local.get(['enabledDomains', 'debugLogging'], (result) => {
       const enabled = result.enabledDomains || {};
+      DEBUG = !!result.debugLogging;
+      if (DEBUG) console.debug('[Raindrop CS] Init', { host, enabled: !(enabled.hasOwnProperty(host) && enabled[host] === false) });
       // Domain is enabled by default if not explicitly set to false
       if (enabled.hasOwnProperty(host) && enabled[host] === false) {
         return;
       }
       const buttonSelectors = Array.isArray(siteConfig.buttonSelector) ? siteConfig.buttonSelector : [siteConfig.buttonSelector];
-      const containerSelectors = Array.isArray(siteConfig.containerSelector) ? siteConfig.containerSelector : [siteConfig.containerSelector];
       // Listen for click events using capture phase to catch early
       document.addEventListener('click', (event) => {
         // Debounce rapid clicks
@@ -665,7 +660,8 @@
         lastClickTime = now;
         const btn = findButton(event.target, buttonSelectors);
         if (btn) {
-          processClick(btn, containerSelectors);
+          if (DEBUG) console.debug('[Raindrop CS] Matched button', btn);
+          processClick(btn, siteConfig);
         }
       }, true);
       // Listen for responses from the background
@@ -675,6 +671,7 @@
             showToast('Saved to Raindrop.io!', true);
           } else {
             showToast(message.error || 'Error saving bookmark.', false);
+            if (DEBUG) console.debug('[Raindrop CS] Save error', message);
           }
         }
       });

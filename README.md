@@ -9,7 +9,7 @@ Save interesting content from your social feeds straight into your Raindrop.io c
 * **Non‑intrusive feedback** – toast notifications let you know when a bookmark is saved or if an error occurs.
 * **Configurable defaults** – choose a default Raindrop.io collection and tags to apply to every bookmark.
 * **Per‑site enable/disable** – toggle the extension on specific domains from the options page without editing code.
-* **Extensible selectors** – add support for new sites simply by editing a configuration file (`site_selectors.js`).
+* **Extensible site config + hooks** – add support for new sites by editing a single configuration file (`scripts/site_selectors.js`) with selectors and optional per‑site hooks.
 
 ## Installation
 
@@ -17,6 +17,25 @@ Save interesting content from your social feeds straight into your Raindrop.io c
 2. Open Chrome and navigate to `chrome://extensions`.
 3. Enable **Developer mode** using the toggle in the top right.
 4. Click **Load unpacked** and choose the `raindrop_extension` directory. The extension icon should appear in your toolbar.
+
+## Project Structure
+
+```
+raindrop_extension/
+├─ scripts/
+│  ├─ content_script.js        # Core logic running on supported sites
+│  ├─ background.js            # Service worker: calls Raindrop API
+│  └─ site_selectors.js        # Site config: selectors + optional hooks
+├─ options/
+│  ├─ options.html             # Options UI
+│  ├─ options.css              # Options styles
+│  └─ options.js               # Options logic
+├─ icons/                      # Extension icons
+├─ manifest.json               # Chrome MV3 manifest
+├─ LICENSE                     # MIT license
+├─ CONTRIBUTING.md             # Contribution guide
+└─ CODE_OF_CONDUCT.md          # Community guidelines
+```
 
 ## Generating a Raindrop.io Test Token
 
@@ -51,14 +70,24 @@ A toast message will appear briefly confirming that the bookmark was saved. If t
 
 ### Content Script
 
-The content script is injected into each supported site when pages finish loading. It loads a configuration object from `site_selectors.js` to determine which buttons and containers to observe. Rather than relying on brittle CSS classes, the configuration uses stable attributes such as `data-testid` and `aria-label` to find the correct elements. Once a native like/upvote button is clicked, the script:
+The content script is injected into each supported site when pages finish loading. It loads a configuration object from `scripts/site_selectors.js` to determine which buttons and containers to observe. Rather than relying on brittle CSS classes, the configuration uses stable attributes such as `data-testid` and `aria-label` to find the correct elements.
+
+Each site can also provide small hook functions to customize behavior without touching the core code:
+
+- `hooks.toggledOnAfterClick(button)`: return true only when a click toggles the positive state (like/upvote on)
+- `hooks.getPermalink(button)`: return a canonical permalink; otherwise a generic extractor finds external links or falls back to canonical/current URL
+- `hooks.getTitle(button)`: override the title
+- `hooks.getExcerpt(button)`: override the excerpt/summary
+
+Once a native like/upvote button is clicked, the script:
 
 1. Debounces the event to avoid duplicate requests from rapid clicks.
 2. Traverses up the DOM to find the nearest container element as defined in the configuration.
 3. Searches within that container for the first `<a>` tag whose domain differs from the current site. If found, that URL becomes the bookmark.
 4. If no external link is found, falls back to the page’s canonical URL (from `<link rel="canonical">`) or `window.location.href`.
 5. Sends a message to the background script with the URL, page title and a short excerpt.
-6. Displays a toast notification while waiting for the result.
+6. Uses site hooks to compute permalink/title/excerpt when available.
+7. Displays a toast notification while waiting for the result.
 
 ### Background Script
 
@@ -70,18 +99,50 @@ The options page is a single HTML document styled with plain CSS. It dynamically
 
 ## Adding Support for New Sites
 
-To add another website, you only need to modify `scripts/site_selectors.js`. Each entry maps a domain name to a **button selector** and a **container selector**. For example:
+To add another website, edit `scripts/site_selectors.js`. Each entry maps a domain name (no `www`) to a **button selector** and a **container selector**, plus optional **hooks**.
+
+Example:
 
 ```js
 "example.com": {
-  // CSS selector for the like/upvote button
+  // CSS selector for the native like/upvote button
   buttonSelector: 'button[aria-label="Like"]',
   // Selector(s) for the element that wraps the entire post or article
-  containerSelector: ['article', 'div.post']
+  containerSelector: ['article', 'div.post'],
+  // Optional hooks for site-specific logic
+  hooks: {
+    toggledOnAfterClick: async (button) => {
+      await new Promise(r => setTimeout(r, 80));
+      const el = button.closest('button') || button;
+      return el && el.getAttribute('aria-pressed') === 'true';
+    },
+    getPermalink: (button) => {
+      const container = button.closest('article') || document;
+      const a = container.querySelector('a[href^="http"]');
+      return a ? a.href : '';
+    },
+    getTitle: () => (document.title || '').slice(0, 200),
+    getExcerpt: (button) => {
+      const container = button.closest('article') || document;
+      return (container.textContent || '').trim().slice(0, 500);
+    }
+  }
 }
 ```
 
-Use attributes like `data-testid` or `aria-label` whenever possible because these tend to be more stable than generated class names. After editing the file reload the extension in `chrome://extensions` and update your settings to enable the new domain.
+Guidelines:
+
+- Use attributes like `data-testid` or `aria-label` when possible; they are more stable than generated class names.
+- Prefer returning stable permalinks (IDs or canonical URLs) in `getPermalink`.
+- Keep hooks small and resilient; guard against missing nodes.
+
+After editing the file:
+
+- Reload the extension in `chrome://extensions`.
+- Ensure the domain is listed in the Options page and enabled.
+- If needed, add the domain to `manifest.json` under `host_permissions` and the `content_scripts[0].matches` list.
+
+See `CONTRIBUTING.md` for a full checklist.
 
 ## Known Limitations
 
@@ -90,5 +151,14 @@ Use attributes like `data-testid` or `aria-label` whenever possible because thes
 * **Link extraction heuristics.** The algorithm picks the first external link in the post container. Some posts contain multiple links; currently there is no way to choose which one is saved.
 
 ## Contributing
+Pull requests and suggestions are welcome. See `CONTRIBUTING.md` for development setup, coding style, and the site‑addition checklist. Please follow the `CODE_OF_CONDUCT.md`.
 
-Pull requests and suggestions are welcome. If you encounter a bug or would like support for another site, feel free to open an issue or extend the `site_selectors.js` configuration.
+## Debugging
+
+- Enable "Debug logging" in the Options page to get verbose logs from the background service worker.
+- To view service worker logs: open `chrome://extensions` → find the extension → "Service worker" → Inspect.
+- For content script logs, open DevTools on the tab where you are testing.
+
+## License
+
+This project is licensed under the MIT License. See `LICENSE` for details.
