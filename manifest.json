@@ -27,7 +27,8 @@
         "*://*.reddit.com/*"
       ],
       "js": ["scripts/content_script.js"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ],
   "background": {

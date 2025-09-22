@@ -11,6 +11,15 @@
   const DEBOUNCE_DELAY = 500; // milliseconds
   let lastClickTime = 0;
   let DEBUG = false;
+  // Track last pointer/mouse position and time to correlate with fallback scans
+  const LAST_EVENT = { x: 0, y: 0, time: 0 };
+  // Deduplicate saves by button element and URL within a short window
+  const processedButtonsTS = new WeakMap(); // Element -> timestamp
+  const recentUrlsTS = new Map(); // url -> timestamp
+  // Track last known ON state (aria-pressed/checked true) per element
+  const lastOnState = new WeakMap(); // Element -> boolean
+  // Track pre-click ON state captured at input event time
+  const preClickOnState = new WeakMap(); // Element -> boolean
 
   /**
    * Load the site selector configuration from the extension package.
@@ -434,6 +443,25 @@
     return null;
   }
 
+  // When events originate inside Shadow DOM, walking parentElement may not cross
+  // the shadow boundary. Prefer scanning the composed path for a direct match.
+  function findButtonInComposedPath(event, selectors) {
+    try {
+      if (!event || typeof event.composedPath !== 'function') return null;
+      const path = event.composedPath();
+      for (const node of path) {
+        if (node && node.nodeType === Node.ELEMENT_NODE) {
+          for (const sel of selectors) {
+            if (typeof sel === 'string' && node.matches && node.matches(sel)) {
+              return node;
+            }
+          }
+        }
+      }
+    } catch (_) { /* ignore */ }
+    return null;
+  }
+
   /**
    * Extract the URL to bookmark based on the smart link extraction algorithm.
    *
@@ -548,7 +576,28 @@
       if (DEBUG) console.debug('[Raindrop CS] Click ignored (toggle not ON)');
       return; // ignore neutral->off or on->off transitions
     }
+    // Additional protection for Reddit: require rising edge (prev OFF -> now ON)
+    if (host === 'reddit.com') {
+      try {
+        const prev = preClickOnState.get(button);
+        preClickOnState.delete(button);
+        if (prev === true) {
+          if (DEBUG) console.debug('[Raindrop CS] Ignoring un-upvote (was ON before click)');
+          return;
+        }
+      } catch (_) { /* ignore */ }
+    }
     const url = computePermalink(button, siteConfig);
+    // Deduplicate by URL to avoid double saves from multiple detectors
+    try {
+      const now = Date.now();
+      const prev = recentUrlsTS.get(url);
+      if (prev && (now - prev) < 2000) {
+        if (DEBUG) console.debug('[Raindrop CS] Skipping duplicate URL save', url);
+        return;
+      }
+      recentUrlsTS.set(url, now);
+    } catch (_) { /* ignore */ }
     if (!url) {
       showToast('Error: Unable to extract link.', false);
       return;
@@ -626,6 +675,8 @@
         excerpt
       }
     });
+    // Mark button as processed to avoid immediate re-processing
+    try { processedButtonsTS.set(button, Date.now()); } catch (_) {}
   }
 
   /**
@@ -650,20 +701,248 @@
         return;
       }
       const buttonSelectors = Array.isArray(siteConfig.buttonSelector) ? siteConfig.buttonSelector : [siteConfig.buttonSelector];
-      // Listen for click events using capture phase to catch early
-      document.addEventListener('click', (event) => {
+      const handleInputEvent = (event) => {
         // Debounce rapid clicks
         const now = Date.now();
         if (now - lastClickTime < DEBOUNCE_DELAY) {
           return;
         }
         lastClickTime = now;
-        const btn = findButton(event.target, buttonSelectors);
+        // Remember pointer position/time for proximity-based fallback
+        try {
+          const pt = /** @type {MouseEvent|PointerEvent} */ (event);
+          if (typeof pt.clientX === 'number' && typeof pt.clientY === 'number') {
+            LAST_EVENT.x = pt.clientX;
+            LAST_EVENT.y = pt.clientY;
+            LAST_EVENT.time = now;
+          }
+        } catch (_) {}
+        let btn = findButtonInComposedPath(event, buttonSelectors);
+        if (!btn) {
+          btn = findButton(event.target, buttonSelectors);
+        }
         if (btn) {
+          // Element-level dedupe window
+          const ts = processedButtonsTS.get(btn);
+          if (ts && (Date.now() - ts) < 1500) return;
+          // Capture pre-click ON state to detect rising edge vs falling edge later
+          try {
+            const ap0 = btn.getAttribute('aria-pressed');
+            const ac0 = btn.getAttribute('aria-checked');
+            const wasOn = ap0 === 'true' || ac0 === 'true';
+            preClickOnState.set(btn, wasOn);
+          } catch (_) { }
           if (DEBUG) console.debug('[Raindrop CS] Matched button', btn);
           processClick(btn, siteConfig);
+        } else if (host === 'reddit.com') {
+          // Fallback: after a short delay, scan for any button that is now toggled ON
+          setTimeout(() => {
+            try {
+              const sels = buttonSelectors.filter(Boolean).join(', ');
+              if (!sels) return;
+              const candidates = Array.from(document.querySelectorAll(sels));
+              // Prefer the ON candidate nearest to the last pointer event
+              const now2 = Date.now();
+              const recentEnough = (now2 - LAST_EVENT.time) < 3000;
+              let best = null; let bestDist = Infinity;
+              for (const el of candidates) {
+                const ap = el.getAttribute('aria-pressed');
+                const ac = el.getAttribute('aria-checked');
+                if (ap === 'true' || ac === 'true') {
+                  const prevOn = lastOnState.get(el) === true;
+                  if (prevOn) continue; // already ON previously; not a rising edge
+                  const ts2 = processedButtonsTS.get(el);
+                  if (ts2 && (now2 - ts2) < 1500) continue;
+                  if (recentEnough && el.getBoundingClientRect) {
+                    const r = el.getBoundingClientRect();
+                    const cx = r.left + r.width/2, cy = r.top + r.height/2;
+                    const dx = cx - LAST_EVENT.x, dy = cy - LAST_EVENT.y;
+                    const d = Math.hypot(dx, dy);
+                    if (d < bestDist) { bestDist = d; best = el; }
+                  } else {
+                    best = el; break;
+                  }
+                } else {
+                  // Store OFF state for future comparison
+                  lastOnState.set(el, false);
+                }
+              }
+              if (best) {
+                if (DEBUG) console.debug('[Raindrop CS] Fallback scan matched button', best);
+                // Mark as ON to avoid double triggers
+                lastOnState.set(best, true);
+                processClick(best, siteConfig);
+              }
+            } catch (_) { }
+          }, 150);
         }
-      }, true);
+      };
+      // Listen on multiple event types to handle sites that prevent default click
+      const eventsToListen = ['click', 'pointerup', 'mousedown'];
+      for (const evt of eventsToListen) {
+        document.addEventListener(evt, handleInputEvent, true);
+      }
+
+      // For Reddit specifically, also observe aria-* attribute changes to catch
+      // state toggles that don't surface as input events (Shadow DOM, etc.).
+      if (host === 'reddit.com') {
+        const seen = new WeakSet();
+        const matchesAny = (el) => {
+          if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+          for (const sel of buttonSelectors) {
+            try { if (typeof sel === 'string' && el.matches && el.matches(sel)) return true; } catch (_) { }
+          }
+          return false;
+        };
+        const processIfOn = (target) => {
+          try {
+            if (!matchesAny(target)) return;
+            const ap = target.getAttribute('aria-pressed');
+            const ac = target.getAttribute('aria-checked');
+            const isOn = ap === 'true' || ac === 'true';
+            const prevOn = lastOnState.get(target) === true;
+            // Update stored state
+            lastOnState.set(target, isOn);
+            // Only trigger on rising edge (off -> on)
+            if (!isOn || prevOn) return;
+            const ts = processedButtonsTS.get(target);
+            if (ts && (Date.now() - ts) < 1500) return;
+            // Use the same saving flow
+            if (DEBUG) console.debug('[Raindrop CS] Mutation matched button', target);
+            processClick(target, siteConfig);
+          } catch (_) { }
+        };
+        // Attach attribute observers and event listeners to a given root
+        const attachToRoot = (root) => {
+          try {
+            if (!root || seen.has(root)) return; // reuse WeakSet to avoid duplicates
+            seen.add(root);
+            // Listen within the shadow root as well
+            try {
+              for (const evt of eventsToListen) {
+                root.addEventListener(evt, handleInputEvent, true);
+              }
+            } catch (_) { }
+            const obs = new MutationObserver((mutations) => {
+              for (const m of mutations) {
+                if (m.type === 'attributes' && (m.attributeName === 'aria-pressed' || m.attributeName === 'aria-checked')) {
+                  const el = /** @type {Element} */ (m.target);
+                  processIfOn(el);
+                }
+                if (m.type === 'childList') {
+                  // If new elements with shadowRoot appear, attach to them
+                  const all = [];
+                  m.addedNodes && m.addedNodes.forEach((n) => { if (n && n.nodeType === Node.ELEMENT_NODE) all.push(n); });
+                  for (const n of all) {
+                    try {
+                      if (n.shadowRoot) attachToRoot(n.shadowRoot);
+                      // Also scan descendants for hosts with shadowRoot
+                      const walker = document.createTreeWalker(n, NodeFilter.SHOW_ELEMENT);
+                      let cur = walker.currentNode;
+                      while (cur) {
+                        if (cur.shadowRoot) attachToRoot(cur.shadowRoot);
+                        cur = walker.nextNode();
+                      }
+                    } catch (_) { }
+                  }
+                }
+              }
+            });
+            obs.observe(root, {
+              subtree: true,
+              attributes: true,
+              attributeFilter: ['aria-pressed', 'aria-checked'],
+              childList: true
+            });
+          } catch (_) { }
+        };
+        const observer = new MutationObserver((mutations) => {
+          for (const m of mutations) {
+            if (m.type === 'attributes' && (m.attributeName === 'aria-pressed' || m.attributeName === 'aria-checked')) {
+              const el = /** @type {Element} */ (m.target);
+              // Update state and trigger only on rising edge
+              processIfOn(el);
+            }
+            if (m.type === 'childList') {
+              // Attach to any new shadow roots
+              const nodes = [];
+              m.addedNodes && m.addedNodes.forEach((n) => { if (n && n.nodeType === Node.ELEMENT_NODE) nodes.push(n); });
+              for (const n of nodes) {
+                try {
+                  if (n.shadowRoot) attachToRoot(n.shadowRoot);
+                  const walker = document.createTreeWalker(n, NodeFilter.SHOW_ELEMENT);
+                  let cur = walker.currentNode;
+                  while (cur) {
+                    if (cur.shadowRoot) attachToRoot(cur.shadowRoot);
+                    cur = walker.nextNode();
+                  }
+                } catch (_) { }
+              }
+            }
+          }
+        });
+        try {
+          observer.observe(document.documentElement || document, {
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['aria-pressed', 'aria-checked'],
+            childList: true
+          });
+        } catch (_) { /* ignore */ }
+        // Attach to existing shadow roots
+        try {
+          const walker = document.createTreeWalker(document, NodeFilter.SHOW_ELEMENT);
+          let node = walker.currentNode;
+          while (node) {
+            if (node instanceof Element && node.shadowRoot) {
+              attachToRoot(node.shadowRoot);
+            }
+            node = walker.nextNode();
+          }
+        } catch (_) { }
+
+        // Last-resort polling fallback (closed shadow roots, missed events)
+        try {
+          const POLL_MS = 800;
+          setInterval(() => {
+            try {
+              const sels = buttonSelectors.filter(Boolean).join(', ');
+              if (!sels) return;
+              const list = Array.from(document.querySelectorAll(sels));
+              const now3 = Date.now();
+              const recentEnough = (now3 - LAST_EVENT.time) < 3000;
+              let best = null; let bestDist = Infinity;
+              for (const el of list) {
+                try {
+                  const ap = el.getAttribute('aria-pressed');
+                  const ac = el.getAttribute('aria-checked');
+                  if (ap === 'true' || ac === 'true') {
+                    const prevOn = lastOnState.get(el) === true;
+                    if (prevOn) continue; // not a rising edge
+                    const ts = processedButtonsTS.get(el);
+                    if (ts && (now3 - ts) < 1500) continue;
+                    if (recentEnough && el.getBoundingClientRect) {
+                      const r = el.getBoundingClientRect();
+                      const cx = r.left + r.width/2, cy = r.top + r.height/2;
+                      const d = Math.hypot(cx - LAST_EVENT.x, cy - LAST_EVENT.y);
+                      if (d < bestDist) { bestDist = d; best = el; }
+                    } else {
+                      best = el; break;
+                    }
+                  } else {
+                    lastOnState.set(el, false);
+                  }
+                } catch (_) { }
+              }
+              if (best) {
+                if (DEBUG) console.debug('[Raindrop CS] Poll matched button', best);
+                lastOnState.set(best, true);
+                processClick(best, siteConfig);
+              }
+            } catch (_) { }
+          }, POLL_MS);
+        } catch (_) { }
+      }
       // Listen for responses from the background
       chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (message && message.type === 'saveResult') {
