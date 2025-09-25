@@ -32,6 +32,57 @@ async function init() {
   const saveButton = document.getElementById('save');
   const debugCheckbox = document.getElementById('debugLogging');
 
+  let initialSerializedState = '';
+
+  const serialiseState = (state) => {
+    const sortedDomains = Object.keys(state.enabledDomains)
+      .sort()
+      .reduce((acc, key) => {
+        acc[key] = !!state.enabledDomains[key];
+        return acc;
+      }, {});
+    return JSON.stringify({
+      token: state.token,
+      defaultCollection: state.defaultCollection,
+      tags: state.tags,
+      enabledDomains: sortedDomains,
+      debugLogging: state.debugLogging
+    });
+  };
+
+  const getCurrentState = () => {
+    const tags = tagsInput.value
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+    const checkboxes = domainsContainer.querySelectorAll('input[type="checkbox"]');
+    const enabledDomains = {};
+    checkboxes.forEach((cb) => {
+      const domain = cb.dataset.domain;
+      enabledDomains[domain] = cb.checked;
+    });
+    const defaultCollection = collectionSelect.value ? Number(collectionSelect.value) : null;
+    return {
+      token: tokenInput.value.trim(),
+      defaultCollection,
+      tags,
+      enabledDomains,
+      debugLogging: !!debugCheckbox.checked
+    };
+  };
+
+  const setInitialState = () => {
+    initialSerializedState = serialiseState(getCurrentState());
+    saveButton.disabled = true;
+  };
+
+  const updateSaveButtonState = () => {
+    const currentSerializedState = serialiseState(getCurrentState());
+    saveButton.disabled = currentSerializedState === initialSerializedState;
+  };
+
+  saveButton.disabled = true;
+
   tokenInput.value = stored.raindropToken || '';
   tagsInput.value = Array.isArray(stored.defaultTags) ? stored.defaultTags.join(', ') : '';
   debugCheckbox.checked = !!stored.debugLogging;
@@ -52,44 +103,42 @@ async function init() {
     wrapper.appendChild(span);
     domainsContainer.appendChild(wrapper);
   });
+
+  setInitialState();
+
+  domainsContainer.addEventListener('change', updateSaveButtonState);
+  tokenInput.addEventListener('input', updateSaveButtonState);
+  collectionSelect.addEventListener('change', updateSaveButtonState);
+  tagsInput.addEventListener('input', updateSaveButtonState);
+  debugCheckbox.addEventListener('change', updateSaveButtonState);
+
   // Populate collections if token present
   if (tokenInput.value) {
     tokenStatus.textContent = 'Connecting…';
-    updateCollections(tokenInput.value, collectionSelect, tokenStatus, stored.defaultCollection);
+    updateCollections(tokenInput.value, collectionSelect, tokenStatus, stored.defaultCollection, setInitialState);
   } else {
     tokenStatus.textContent = 'Not connected';
   }
   // Save handler
   saveButton.addEventListener('click', async () => {
-    const token = tokenInput.value.trim();
-    const tags = tagsInput.value
-      .split(',')
-      .map((t) => t.trim())
-      .filter((t) => t.length > 0);
-    // Gather enabled domains
-    const checkboxes = domainsContainer.querySelectorAll('input[type="checkbox"]');
-    const enabledDomains = {};
-    checkboxes.forEach((cb) => {
-      const domain = cb.dataset.domain;
-      enabledDomains[domain] = cb.checked;
-    });
-    const defaultCollection = collectionSelect.value ? Number(collectionSelect.value) : null;
+    const currentState = getCurrentState();
     // Persist settings
     chrome.storage.local.set({
-      raindropToken: token,
-      defaultCollection: defaultCollection,
-      defaultTags: tags,
-      enabledDomains: enabledDomains,
-      debugLogging: !!debugCheckbox.checked
+      raindropToken: currentState.token,
+      defaultCollection: currentState.defaultCollection,
+      defaultTags: currentState.tags,
+      enabledDomains: currentState.enabledDomains,
+      debugLogging: currentState.debugLogging
     }, () => {
       // After saving, validate token and update collections
-      if (token) {
+      if (currentState.token) {
         tokenStatus.textContent = 'Connecting…';
-        updateCollections(token, collectionSelect, tokenStatus, defaultCollection);
+        updateCollections(currentState.token, collectionSelect, tokenStatus, currentState.defaultCollection, setInitialState);
       } else {
         tokenStatus.textContent = 'Not connected';
         // Clear collection select
         collectionSelect.innerHTML = '<option value="">-- select collection --</option>';
+        setInitialState();
       }
     });
   });
@@ -103,12 +152,16 @@ async function init() {
  * @param {HTMLSelectElement} select The select element to populate.
  * @param {HTMLElement} statusEl Element for displaying status messages.
  * @param {number|null} currentSelection Currently stored collection id.
+ * @param {Function} [onComplete] Callback invoked when the update finishes.
  */
-function updateCollections(token, select, statusEl, currentSelection) {
+function updateCollections(token, select, statusEl, currentSelection, onComplete) {
   chrome.runtime.sendMessage({ action: 'validateToken' }, (validateRes) => {
     if (!validateRes || !validateRes.valid) {
       statusEl.textContent = 'Invalid token';
       select.innerHTML = '<option value="">-- select collection --</option>';
+      if (onComplete) {
+        onComplete();
+      }
       return;
     }
     // Token valid: fetch collections
@@ -116,6 +169,9 @@ function updateCollections(token, select, statusEl, currentSelection) {
       if (!res || res.error) {
         statusEl.textContent = 'Error fetching collections';
         select.innerHTML = '<option value="">-- select collection --</option>';
+        if (onComplete) {
+          onComplete();
+        }
         return;
       }
       const collections = res.collections || [];
@@ -133,6 +189,9 @@ function updateCollections(token, select, statusEl, currentSelection) {
         select.appendChild(opt);
       });
       statusEl.textContent = 'Connected';
+      if (onComplete) {
+        onComplete();
+      }
     });
   });
 }
