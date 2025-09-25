@@ -1,24 +1,65 @@
-# Social Media to Raindrop.io Chrome Extension
+Social Media to Raindrop.io Chrome Extension
+--------------------------------------------
 
-Save interesting content from your social feeds straight into your Raindrop.io collections. Once configured, this extension listens for clicks on the native **Like**, **Bookmark** or **Upvote** buttons on supported websites and automatically creates a bookmark (called a “raindrop”) in your Raindrop.io account.
+Save interesting content from your social feeds straight into your Raindrop.io collections. Once configured, this extension listens for clicks on the native **Like**, **Bookmark**, or **Upvote** buttons on supported websites and automatically creates a bookmark in your Raindrop.io account.
 
-## Features
+### Features
 
-* **One‑click bookmarking** – click the like/upvote button on Twitter/X, YouTube or Reddit and the post's primary link or canonical URL is saved to Raindrop.io.
-* **Smart link extraction** – the content script looks for external links inside the post first. If none are found it falls back to the canonical URL of the post or the current page.
-* **Non‑intrusive feedback** – toast notifications let you know when a bookmark is saved or if an error occurs.
-* **Configurable defaults** – choose a default Raindrop.io collection and tags to apply to every bookmark.
-* **Per‑site enable/disable** – toggle the extension on specific domains from the options page without editing code.
-* **Extensible site config + hooks** – add support for new sites by editing a single configuration file (`src/scripts/site_selectors.js`) with selectors and optional per‑site hooks.
+-   **Instant Saves:** Tap Like or Upvote on Twitter/X, YouTube, or Reddit, and the extension quietly delivers the post's main link to Raindrop.io.
+-   **Intelligent Link Detection:** The extension hunts for outbound links within a post and gracefully falls back to the canonical URL when no external links are available.
+-   **Friendly Confirmations:** Lightweight toast messages celebrate every success and surface issues before they slow you down.
+-   **Personalized Defaults:** Set your go-to collection and tags once, and every bookmark will land in the perfect spot.
+-   **Domain-Level Control:** Use the options page to pause or resume the extension on individual sites with no code edits required.
+-   **Built for Expansion:** Add support for more communities in minutes by adding new selectors or optional hooks into `src/scripts/site_selectors.js`.
 
-## Installation
+### Why Use This Extension?
 
-1. Clone or download this repository and locate the `raindrop_extension` folder.
-2. Open Chrome and navigate to `chrome://extensions`.
-3. Enable **Developer mode** using the toggle in the top right.
-4. Click **Load unpacked** and choose the `raindrop_extension` directory. The extension icon should appear in your toolbar.
+-   **Save Content Instantly:** Capture links the moment you react to them, eliminating the need for extra clicks or to copy and paste URLs into Raindrop.io later.
+-   **Keep Collections Curated:** Automatically apply your preferred collection and tag defaults so everything lands exactly where you expect it.
+-   **Works with Major Platforms:** Ships with first-class support for Twitter/X, YouTube, and Reddit, and is easily extensible for more sites.
+-   **Respectful by Design:** Stores tokens only in `chrome.storage.local`, offers visible toast feedback, and lets you disable individual domains when you need a quieter feed experience.
 
-## Project Structure
+### Requirements
+
+-   Google Chrome 110+ (or any Chromium-based browser that supports Manifest V3 and `chrome://extensions` developer mode).
+-   Node.js 18+ and npm 9+ to run the build tooling.
+-   A Raindrop.io account with access to generate a test token.
+
+### Installation
+
+1.  Clone or download this repository, then open a terminal inside the `raindrop_extension/` directory.\
+    *Note: You will need to replace `<your-org>` with the correct repository path.*
+
+    bash
+
+    ```
+    git clone https://github.com/<your-org>/raindrop_extension.git
+    cd raindrop_extension
+    ```
+
+2.  Install the JavaScript dependencies.
+
+    bash
+    ```
+    npm install
+    ```
+
+3.  Build the extension bundle and copy static assets into the `dist/` directory. This command removes any previous `dist/` contents and regenerates all necessary assets.
+
+    bash
+    ```
+    npm run build
+    ```
+
+4.  Open Google Chrome and navigate to `chrome://extensions/`.
+5.  Toggle **Developer mode** on in the top-right corner of the page.
+6.  Click **Load unpacked**, then browse to and select the freshly generated `dist/` directory.
+7.  Confirm the extension appears in the list. If desired, pin it to the toolbar for quick access.
+8.  When you make code changes later, rerun `npm run build` (or keep `npm run dev` running) and then click the **Refresh** button on the extension card inside `chrome://extensions/`.
+
+### Project Structure
+
+mipsasm
 
 ```
 raindrop_extension/
@@ -41,95 +82,100 @@ raindrop_extension/
 └─ CODE_OF_CONDUCT.md          # Community guidelines
 ```
 
-> **Note**: Source files live under `src/`. Run `npm run build` to produce the bundled extension inside `dist/` before loading it into Chrome.
+> **Note**: Source files are located in the `src/` directory. Run `npm run build` to produce the bundled extension inside `dist/` before loading it into Chrome.
 
-## Getting Started (Development)
+### Getting Started (Development)
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-2. Produce a fresh build (outputs to `dist/`):
-   ```bash
-   npm run build
-   ```
-3. For iterative work, run the watcher to rebuild on change:
-   ```bash
-   npm run dev
-   ```
-4. Load the extension from the `dist/` directory via `chrome://extensions` → **Load unpacked**.
+1.  Install dependencies:
 
-The build pipeline uses `esbuild` with an asset-copy plugin so that bundled JavaScript and static assets are always in sync. `npm run clean` removes the `dist/` directory.
+    bash
 
-## Generating a Raindrop.io Test Token
+    ```
+    npm install
+    ```
+
+2.  Produce a fresh build, which outputs to the `dist/` directory:
+
+    bash
+    ```
+    npm run build
+    ```
+
+3.  For iterative work, run the watcher to rebuild automatically on changes:
+
+    bash
+    ```
+    npm run dev
+    ```
+
+4.  Load the extension from the `dist/` directory via `chrome://extensions` → **Load unpacked**.
 
 To allow the extension to create bookmarks, you need a **test token** from Raindrop.io:
 
-1. Log in to your [Raindrop.io account](https://raindrop.io/).
-2. Go to **Settings → Integrations** and locate the *API* section.
-3. Click **Get test token** and copy the generated token. This token is used as a Bearer token in the `Authorization` header for every API call【790805987407026†L59-L66】.
+1.  Log in to your Raindrop.io account.
+2.  Go to **Settings → Integrations** and locate the **API** section.
+3.  Click **Get test token** and copy the generated token. This token is used as a Bearer token in the `Authorization` header for every API call.
 
-Test tokens are scoped to your account and can be revoked at any time. Store it carefully – the extension only saves it locally using `chrome.storage.local`.
+Test tokens are scoped to your account and can be revoked at any time. Store it carefully; the extension only saves it locally using `chrome.storage.local`.
 
-## Configuring the Extension
+### Configuring the Extension
 
-1. Right‑click the extension icon and choose **Options**, or click the extension in the toolbar and select **Options**.
-2. Paste your test token into the **API Token** field.
-3. After saving, the extension will validate your token and fetch your collections. Select a default collection or leave it unset to use your Inbox.
-4. Enter comma‑separated default tags (e.g. `social, from-twitter`) if desired. These tags will be applied to every bookmark.
-5. Use the checkboxes under **Enabled Domains** to turn the extension on or off for supported websites.
-6. Click **Save settings** to persist your changes. Changes take effect immediately.
+1.  Open the extension's options page.
+2.  Paste your test token into the **API Token** field.
+3.  After saving, the extension will validate your token and fetch your collections. Select a default collection or leave it unset to use your Inbox.
+4.  Enter comma-separated default tags (e.g., `social, from-twitter`) if desired. These tags will be applied to every bookmark.
+5.  Use the checkboxes under **Enabled Domains** to turn the extension on or off for supported websites.
+6.  Click **Save settings** to persist your changes. Changes take effect immediately.
 
-When configured correctly the status indicator will show **Connected** and your collection list will populate.
+When configured correctly, the status indicator will show **Connected** and your collection list will populate.
 
-## Using the Extension
+### Using the Extension
 
-* On Twitter/X, click the ❤️ Like button beneath a tweet. The extension climbs the DOM to find the enclosing `<article>` and looks for the first external link. If found, that link is bookmarked. Otherwise the canonical tweet URL is saved.
-* On YouTube, click the 👍 Like button beneath a video. Since videos are their own pages, the canonical video URL is saved.
-* On Reddit, click the ⬆️ Upvote button on a post. The script inspects the post container (`data-testid="post-container"`) for an external link; if none exist the post URL is used.
+-   **On Twitter/X**, click the ❤️ **Like** button beneath a tweet. The extension climbs the DOM to find the enclosing `<article>` and looks for the first external link. If found, that link is bookmarked. Otherwise, the canonical tweet URL is saved.
+-   **On YouTube**, click the 👍 **Like** button beneath a video. The canonical video URL is saved.
+-   **On Reddit**, click the ⬆️ **Upvote** button on a post. The script inspects the post container for an external link; if none exists, the post URL is used.
 
-A toast message will appear briefly confirming that the bookmark was saved. If the API token is invalid or the Raindrop.io API returns an error (including 429 rate‑limits) the toast will display an error message.
+A toast message will appear briefly confirming that the bookmark was saved. If the API token is invalid or the Raindrop.io API returns an error (including 429 rate limits), the toast will display an error message.
 
-## How It Works
+### How It Works
 
-### Content Script
+#### Content Script
 
-The content script is injected into each supported site when pages finish loading. It loads a configuration object from `scripts/site_selectors.js` to determine which buttons and containers to observe. Rather than relying on brittle CSS classes, the configuration uses stable attributes such as `data-testid` and `aria-label` to find the correct elements.
+The content script is injected into each supported site when the page finishes loading. It uses a configuration object from `scripts/site_selectors.js` to determine which buttons and containers to observe. Rather than relying on brittle CSS classes, the configuration uses stable attributes such as `data-testid` and `aria-label` to find the correct elements.
 
-Each site can also provide small hook functions to customize behavior without touching the core code. See `src/scripts/site_selectors.js` for examples:
+When a supported button is clicked, the following occurs:
 
-- `hooks.toggledOnAfterClick(button)`: return true only when a click toggles the positive state (like/upvote on)
-- `hooks.getPermalink(button)`: return a canonical permalink; otherwise a generic extractor finds external links or falls back to canonical/current URL
-- `hooks.getTitle(button)`: override the title
-- `hooks.getExcerpt(button)`: override the excerpt/summary
+1.  The event is debounced to avoid duplicate requests from rapid clicks.
+2.  The script traverses up the DOM to find the nearest container element defined in the configuration.
+3.  It searches within that container for the first `<a>` tag whose domain differs from the current site. If found, that URL is used for the bookmark.
+4.  If no external link is found, it falls back to the page's canonical URL or `window.location.href`.
+5.  A message containing the URL, page title, and a short excerpt is sent to the background script.
+6.  A toast notification is displayed while awaiting the result.
 
-When a supported like/upvote button is clicked, the flow is:
+Each site can also provide small hook functions to customize behavior. See `src/scripts/site_selectors.js` for examples:
 
-1. Debounce the event to avoid duplicate requests from rapid clicks.
-2. Traverse up the DOM to find the nearest container element as defined in the configuration.
-3. Search within that container for the first `<a>` tag whose domain differs from the current site. If found, that URL becomes the bookmark.
-4. If no external link is found, fall back to the page’s canonical URL (from `<link rel="canonical">`) or `window.location.href`.
-5. Send a message to the background script with the URL, page title and a short excerpt.
-6. Use site hooks to compute permalink/title/excerpt when available.
-7. Display a toast notification while waiting for the result.
+-   `hooks.toggledOnAfterClick(button)`: Returns `true` only when a click toggles the positive state (e.g., the like button is now "on").
+-   `hooks.getPermalink(button)`: Returns a canonical permalink.
+-   `hooks.getTitle(button)`: Overrides the page title.
+-   `hooks.getExcerpt(button)`: Overrides the summary excerpt.
 
-### Background Script
+#### Background Script
 
-The service worker (`src/scripts/background.js`) listens for messages and uses the Raindrop.io API to create bookmarks. When a `save` message arrives, it reads the token, default collection/tags, and debug flag via the shared storage helpers. It then calls `POST https://api.raindrop.io/rest/v1/raindrop` with the bookmark details. A 429 response triggers a configurable backoff window, while a 401 response clears the invalid token from storage and surfaces an error toast. The worker also exposes `getCollections` (`GET https://api.raindrop.io/rest/v1/collections` and `GET https://api.raindrop.io/rest/v1/collections/childrens`) and `validateToken` actions for the options UI.
+The service worker (`src/scripts/background.js`) listens for messages and uses the Raindrop.io API to create bookmarks. When a `save` message arrives, it reads the user's token and default settings and calls `POST https://api.raindrop.io/rest/v1/raindrop`. A 429 response triggers a configurable backoff window, while a 401 response clears the invalid token from storage and displays an error. The worker also handles API requests for the options page, such as `getCollections` and `validateToken`.
 
-### Options Page
+#### Adding a New Website
 
-The options page is a single HTML document styled with plain CSS. It dynamically loads the list of supported domains from `site_selectors.js` and builds a set of checkboxes. When a test token is entered and saved, the page sends a `validateToken` message to the background worker. If valid, a `getCollections` message is sent to fetch all collections, which are then displayed in a dropdown. The selected settings are persisted to `chrome.storage.local` and read by both the content and background scripts.
+To add another website, edit `src/scripts/site_selectors.js`. Each entry maps a domain name to a `buttonSelector` and a `containerSelector`, plus optional `hooks`.
 
-To add another website, edit `src/scripts/site_selectors.js`. Each entry maps a domain name (no `www`) to a **button selector** and a **container selector**, plus optional **hooks**.
+**Example:**
 
-Example:
+javascript
 
-```js
+```
 "example.com": {
   // CSS selector for the native like/upvote button
   buttonSelector: 'button[aria-label="Like"]',
-  // Selector(s) for the element that wraps the entire post or article
+  // Selector(s) for the element that wraps the entire post
   containerSelector: ['article', 'div.post'],
   // Optional hooks for site-specific logic
   hooks: {
@@ -142,45 +188,34 @@ Example:
       const container = button.closest('article') || document;
       const a = container.querySelector('a[href^="http"]');
       return a ? a.href : '';
-    },
-    getTitle: () => (document.title || '').slice(0, 200),
-    getExcerpt: (button) => {
-      const container = button.closest('article') || document;
-      return (container.textContent || '').trim().slice(0, 500);
     }
   }
 }
 ```
 
-Guidelines:
+**Guidelines:**
 
-- Use attributes like `data-testid` or `aria-label` when possible; they are more stable than generated class names.
-- Prefer returning stable permalinks (IDs or canonical URLs) in `getPermalink`.
-- Keep hooks small and resilient; guard against missing nodes.
+-   Use stable attributes like `data-testid` or `aria-label` when possible.
+-   Prefer returning stable permalinks in the `getPermalink` hook.
+-   Keep hooks small and resilient to prevent errors from missing nodes.
+-   After editing the file, reload the extension and ensure the new domain is enabled in the Options page and added to `manifest.json`.
 
-After editing the file:
+### Known Limitations
 
-- Reload the extension in `chrome://extensions`.
-- Ensure the domain is listed in the Options page and enabled.
-- If needed, add the domain to `manifest.json` under `host_permissions` and the `content_scripts[0].matches` list.
+-   **"Unlike" actions are ignored.** Only positive clicks (Like, Upvote) trigger bookmarking. This prevents accidental deletion from your Raindrop.io collection.
+-   **Rate Limiting.** The Raindrop.io API limits requests. The extension applies a simple backoff if a 429 response is received, but rapid clicks may still result in temporary failures.
+-   **Link Extraction.** The algorithm picks the first external link it finds in a post. There is currently no way to choose which link is saved if a post contains multiple.
 
-See `CONTRIBUTING.md` for a full checklist.
+### Contributing
 
-## Known Limitations
+Pull requests and suggestions are welcome. See `CONTRIBUTING.md` for development setup and coding style. Please follow the `CODE_OF_CONDUCT.md`.
 
-* **“Unlike” or “un‑upvote” actions do nothing.** Only positive clicks trigger bookmarking. This prevents accidental deletion from your Raindrop.io collection.
-* **Rate limiting.** The Raindrop.io API allows a limited number of requests per minute. The extension applies a simple backoff if a 429 response is received. Repeatedly liking posts very quickly may result in temporary failures.
-* **Link extraction heuristics.** The algorithm picks the first external link in the post container. Some posts contain multiple links; currently there is no way to choose which one is saved.
+### Debugging
 
-## Contributing
-Pull requests and suggestions are welcome. See `CONTRIBUTING.md` for development setup, coding style, and the site‑addition checklist. Please follow the `CODE_OF_CONDUCT.md`.
+-   Enable "Debug logging" in the Options page to get verbose logs from the service worker.
+-   To view service worker logs, go to `chrome://extensions`, find the extension, and click the "Service worker" link.
+-   For content script logs, open the browser's DevTools on the tab where you are testing.
 
-## Debugging
+### License
 
-- Enable "Debug logging" in the Options page to get verbose logs from the background service worker.
-- To view service worker logs: open `chrome://extensions` → find the extension → "Service worker" → Inspect.
-- For content script logs, open DevTools on the tab where you are testing.
-
-## License
-
-This project is licensed under the MIT License. See `LICENSE` for details.
+This project is licensed under the MIT License. See the `LICENSE` file for details.
