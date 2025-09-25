@@ -22,6 +22,9 @@ import { getFromStorage } from '../config/storage.js';
   const YT_DESC_RETRY = TIMING.YOUTUBE_DESCRIPTION_RETRY_MS;
   let lastClickTime = 0;
   let DEBUG = false;
+  let activeToast = null;
+  let activeToastTimer = null;
+  let activeToastRemovalTimer = null;
   // Track last pointer/mouse position and time to correlate with fallback scans
   const LAST_EVENT = { x: 0, y: 0, time: 0 };
   // Deduplicate saves by button element and URL within a short window
@@ -371,19 +374,243 @@ import { getFromStorage } from '../config/storage.js';
   /**
    * Build a toast container if it doesn't already exist.
    */
+  function dismissActiveToast(immediate = false) {
+    if (!activeToast) return;
+    if (activeToastTimer) {
+      clearTimeout(activeToastTimer);
+      activeToastTimer = null;
+    }
+    if (activeToastRemovalTimer) {
+      clearTimeout(activeToastRemovalTimer);
+      activeToastRemovalTimer = null;
+    }
+    const toast = activeToast;
+    if (immediate) {
+      if (toast.isConnected) toast.remove();
+    } else {
+      toast.classList.add('raindrop-toast--closing');
+      activeToastRemovalTimer = setTimeout(() => {
+        if (toast.isConnected) toast.remove();
+      }, Math.max(TOAST_FADE, 500));
+    }
+    activeToast = null;
+  }
+
+  function createToastElement() {
+    const toast = document.createElement('div');
+    toast.className = 'raindrop-toast raindrop-toast--neutral';
+    toast.setAttribute('role', 'status');
+    const icon = document.createElement('span');
+    icon.className = 'raindrop-toast__icon';
+    const label = document.createElement('span');
+    label.className = 'raindrop-toast__label';
+    const progress = document.createElement('span');
+    progress.className = 'raindrop-toast__progress';
+    toast.append(icon, label, progress);
+    return toast;
+  }
+
+  function applyToastState(toast, message, success) {
+    toast.classList.remove('raindrop-toast--neutral', 'raindrop-toast--success', 'raindrop-toast--error', 'raindrop-toast--closing');
+    let variant = 'raindrop-toast--neutral';
+    let iconGlyph = '💧';
+    if (success === true) {
+      variant = 'raindrop-toast--success';
+      iconGlyph = '✓';
+    } else if (success === false) {
+      variant = 'raindrop-toast--error';
+      iconGlyph = '⚠';
+    }
+    toast.classList.add(variant);
+    toast.style.setProperty('--rd-toast-duration', `${TOAST_DURATION}ms`);
+
+    const icon = toast.querySelector('.raindrop-toast__icon');
+    if (icon) icon.textContent = iconGlyph;
+
+    const label = toast.querySelector('.raindrop-toast__label');
+    if (label) label.textContent = message;
+
+    const existingProgress = toast.querySelector('.raindrop-toast__progress');
+    if (existingProgress) {
+      const replacement = existingProgress.cloneNode(false);
+      replacement.className = 'raindrop-toast__progress';
+      existingProgress.replaceWith(replacement);
+    } else {
+      const progress = document.createElement('span');
+      progress.className = 'raindrop-toast__progress';
+      toast.appendChild(progress);
+    }
+  }
+
+  function scheduleToastLifecycle(toast) {
+    if (activeToastTimer) {
+      clearTimeout(activeToastTimer);
+      activeToastTimer = null;
+    }
+    if (activeToastRemovalTimer) {
+      clearTimeout(activeToastRemovalTimer);
+      activeToastRemovalTimer = null;
+    }
+    activeToastTimer = setTimeout(() => {
+      toast.classList.add('raindrop-toast--closing');
+      activeToastRemovalTimer = setTimeout(() => {
+        if (toast.isConnected) toast.remove();
+        if (toast === activeToast) {
+          activeToast = null;
+          activeToastTimer = null;
+          activeToastRemovalTimer = null;
+        }
+      }, Math.max(TOAST_FADE, 500));
+    }, TOAST_DURATION);
+  }
+
+  function ensureToastStyles() {
+    if (document.getElementById('raindrop-toast-styles')) {
+      return;
+    }
+    const style = document.createElement('style');
+    style.id = 'raindrop-toast-styles';
+    style.textContent = `
+      #raindrop-toast-container {
+        position: fixed;
+        top: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 2147483647;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        pointer-events: none;
+      }
+      .raindrop-toast {
+        pointer-events: auto;
+        color: #f5f6ff;
+        border-radius: 16px;
+        padding: 14px 18px 14px 52px;
+        font-size: 15px;
+        line-height: 1.4;
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        box-shadow: 0 20px 45px rgba(38, 23, 83, 0.35);
+        position: relative;
+        overflow: hidden;
+        min-width: 280px;
+        max-width: min(420px, 92vw);
+        backdrop-filter: blur(18px) saturate(140%);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        opacity: 0;
+        transform: translateY(-16px) scale(0.96);
+        animation: rd-toast-enter 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      }
+      .raindrop-toast::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.35), transparent 55%);
+        mix-blend-mode: screen;
+        opacity: 0.75;
+      }
+      .raindrop-toast::after {
+        content: '';
+        position: absolute;
+        width: 160px;
+        height: 160px;
+        top: -80px;
+        right: -60px;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.45), transparent 60%);
+        filter: blur(10px);
+        opacity: 0.8;
+        animation: rd-toast-orbit 6s ease-in-out infinite;
+      }
+      .raindrop-toast__icon {
+        position: absolute;
+        left: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.55));
+        display: grid;
+        place-items: center;
+        color: #3a2b6d;
+        font-size: 18px;
+        box-shadow: 0 6px 18px rgba(24, 24, 37, 0.2);
+      }
+      .raindrop-toast__label {
+        position: relative;
+        z-index: 1;
+        display: block;
+      }
+      .raindrop-toast__progress {
+        position: absolute;
+        left: 52px;
+        right: 18px;
+        bottom: 10px;
+        height: 3px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.25);
+        overflow: hidden;
+      }
+      .raindrop-toast__progress::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.3));
+        transform: translateX(-100%);
+        animation: rd-toast-progress var(--rd-toast-duration, 3600ms) linear forwards;
+      }
+      .raindrop-toast--neutral {
+        background: linear-gradient(135deg, rgba(85, 110, 255, 0.92), rgba(163, 103, 255, 0.9));
+      }
+      .raindrop-toast--success {
+        background: linear-gradient(135deg, rgba(46, 201, 140, 0.95), rgba(66, 201, 255, 0.9));
+      }
+      .raindrop-toast--error {
+        background: linear-gradient(135deg, rgba(255, 105, 115, 0.96), rgba(255, 162, 105, 0.9));
+      }
+      .raindrop-toast--closing {
+        animation: rd-toast-leave 0.45s ease forwards;
+      }
+      @keyframes rd-toast-enter {
+        0% { opacity: 0; transform: translateY(-16px) scale(0.96); }
+        60% { opacity: 1; transform: translateY(4px) scale(1.02); }
+        100% { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      @keyframes rd-toast-leave {
+        0% { opacity: 1; transform: translateY(0) scale(1); }
+        100% { opacity: 0; transform: translateY(-12px) scale(0.94); }
+      }
+      @keyframes rd-toast-orbit {
+        0% { opacity: 0.7; transform: rotate(0deg) translate(0, 0); }
+        50% { opacity: 1; transform: rotate(12deg) translate(-4px, 6px); }
+        100% { opacity: 0.7; transform: rotate(0deg) translate(0, 0); }
+      }
+      @keyframes rd-toast-progress {
+        from { transform: translateX(-100%); }
+        to { transform: translateX(0); }
+      }
+    `;
+    (document.head || document.documentElement || document.body).appendChild(style);
+  }
+
   function ensureToastContainer() {
+    ensureToastStyles();
     let container = document.getElementById('raindrop-toast-container');
     if (!container) {
       container = document.createElement('div');
       container.id = 'raindrop-toast-container';
       Object.assign(container.style, {
         position: 'fixed',
-        bottom: '20px',
-        right: '20px',
+        top: '24px',
+        left: '50%',
+        transform: 'translateX(-50%)',
         zIndex: '2147483647',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'flex-end'
+        alignItems: 'center',
+        gap: '12px',
+        pointerEvents: 'none'
       });
       document.body.appendChild(container);
     }
@@ -400,37 +627,30 @@ import { getFromStorage } from '../config/storage.js';
    * @param {boolean|null} success Outcome state: true for success,
    *   false for error, null/undefined for neutral/in-progress.
    */
-  function showToast(message, success = null) {
+  function showToast(message, success = null, options = {}) {
+    const opts = (options && typeof options === 'object') ? options : {};
+    const reuseActive = !!opts.reuseActive;
     const container = ensureToastContainer();
-    const toast = document.createElement('div');
-    toast.textContent = message;
-    // Base styling
-    Object.assign(toast.style, {
-      color: '#fff',
-      marginTop: '8px',
-      borderRadius: '4px',
-      padding: '8px 12px',
-      boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-      opacity: '1',
-      transition: 'opacity 0.5s ease-out',
-      maxWidth: '320px'
-    });
-    // Colour based on status
-    if (success === true) {
-      toast.style.background = '#4CAF50'; // green
-    } else if (success === false) {
-      toast.style.background = '#e53935'; // red
+    const canReuseActive = reuseActive && activeToast && activeToast.isConnected;
+
+    let toast;
+    if (canReuseActive) {
+      toast = activeToast;
+      toast.classList.remove('raindrop-toast--closing');
     } else {
-      toast.style.background = '#333'; // neutral dark
+      if (activeToast && activeToast.isConnected) {
+        dismissActiveToast(true);
+      } else {
+        dismissActiveToast();
+      }
+      toast = createToastElement();
+      container.appendChild(toast);
+      activeToast = toast;
     }
-    container.appendChild(toast);
-    // Schedule removal after fade
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      setTimeout(() => {
-        toast.remove();
-      }, TOAST_FADE);
-    }, TOAST_DURATION);
+
+    applyToastState(toast, message, success);
+    scheduleToastLifecycle(toast);
+    return toast;
   }
 
   /**
@@ -612,7 +832,7 @@ import { getFromStorage } from '../config/storage.js';
       return;
     }
     // Provide immediate feedback
-    showToast('Saving to Raindrop.io…');
+    showToast('Saving to Raindrop.io…', null, { reuseActive: true });
     let title = document.title || '';
     // Extract a brief excerpt. For Twitter/X and YouTube, use site-specific logic.
     let excerpt = '';
@@ -955,9 +1175,9 @@ import { getFromStorage } from '../config/storage.js';
     chrome.runtime.onMessage.addListener((message) => {
       if (message && message.type === 'saveResult') {
         if (message.status === 'success') {
-          showToast('Saved to Raindrop.io!', true);
+          showToast('Saved to Raindrop.io!', true, { reuseActive: true });
         } else {
-          showToast(message.error || 'Error saving bookmark.', false);
+          showToast(message.error || 'Error saving bookmark.', false, { reuseActive: true });
           if (DEBUG) console.debug('[Raindrop CS] Save error', message);
         }
       }
