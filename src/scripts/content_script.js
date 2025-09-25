@@ -1,3 +1,6 @@
+import { TIMING, STORAGE_KEYS } from '../config/constants.js';
+import { getFromStorage } from '../config/storage.js';
+
 // Content script for the Social Media to Raindrop.io extension.
 //
 // This script is injected into supported social media sites (Twitter/X,
@@ -8,7 +11,15 @@
 // raindrop. Feedback is provided to the user via toast messages.
 
 (() => {
-  const DEBOUNCE_DELAY = 500; // milliseconds
+  const DEBOUNCE_DELAY = TIMING.CONTENT_CLICK_DEBOUNCE_MS;
+  const BUTTON_DEDUPE_WINDOW = TIMING.BUTTON_DEDUPE_WINDOW_MS;
+  const URL_DEDUPE_WINDOW = TIMING.URL_DEDUPE_WINDOW_MS;
+  const REDDIT_SCAN_DELAY = TIMING.REDDIT_SCAN_DELAY_MS;
+  const REDDIT_POINTER_MAX_AGE = TIMING.REDDIT_POINTER_MAX_AGE_MS;
+  const REDDIT_POLL_INTERVAL = TIMING.REDDIT_POLL_INTERVAL_MS;
+  const TOAST_DURATION = TIMING.TOAST_DURATION_MS;
+  const TOAST_FADE = TIMING.TOAST_FADE_MS;
+  const YT_DESC_RETRY = TIMING.YOUTUBE_DESCRIPTION_RETRY_MS;
   let lastClickTime = 0;
   let DEBUG = false;
   // Track last pointer/mouse position and time to correlate with fallback scans
@@ -418,8 +429,8 @@
       toast.style.opacity = '0';
       setTimeout(() => {
         toast.remove();
-      }, 500);
-    }, 3000);
+      }, TOAST_FADE);
+    }, TOAST_DURATION);
   }
 
   /**
@@ -690,14 +701,14 @@
       return; // unsupported site
     }
     // Retrieve enablement settings
-    chrome.storage.local.get(['enabledDomains', 'debugLogging'], (result) => {
-      const enabled = result.enabledDomains || {};
-      DEBUG = !!result.debugLogging;
-      if (DEBUG) console.debug('[Raindrop CS] Init', { host, enabled: !(enabled.hasOwnProperty(host) && enabled[host] === false) });
-      // Domain is enabled by default if not explicitly set to false
-      if (enabled.hasOwnProperty(host) && enabled[host] === false) {
-        return;
-      }
+    const stored = await getFromStorage([STORAGE_KEYS.ENABLED_DOMAINS, STORAGE_KEYS.DEBUG_LOGGING]);
+    const enabled = stored[STORAGE_KEYS.ENABLED_DOMAINS] || {};
+    DEBUG = !!stored[STORAGE_KEYS.DEBUG_LOGGING];
+    if (DEBUG) console.debug('[Raindrop CS] Init', { host, enabled: !(Object.prototype.hasOwnProperty.call(enabled, host) && enabled[host] === false) });
+    // Domain is enabled by default if not explicitly set to false
+    if (Object.prototype.hasOwnProperty.call(enabled, host) && enabled[host] === false) {
+      return;
+    }
       const buttonSelectors = Array.isArray(siteConfig.buttonSelector) ? siteConfig.buttonSelector : [siteConfig.buttonSelector];
       const handleInputEvent = (event) => {
         // Debounce rapid clicks
@@ -722,7 +733,7 @@
         if (btn) {
           // Element-level dedupe window
           const ts = processedButtonsTS.get(btn);
-          if (ts && (Date.now() - ts) < 1500) return;
+          if (ts && (Date.now() - ts) < BUTTON_DEDUPE_WINDOW) return;
           // Capture pre-click ON state to detect rising edge vs falling edge later
           try {
             const ap0 = btn.getAttribute('aria-pressed');
@@ -741,7 +752,7 @@
               const candidates = Array.from(document.querySelectorAll(sels));
               // Prefer the ON candidate nearest to the last pointer event
               const now2 = Date.now();
-              const recentEnough = (now2 - LAST_EVENT.time) < 3000;
+              const recentEnough = (now2 - LAST_EVENT.time) < REDDIT_POINTER_MAX_AGE;
               let best = null; let bestDist = Infinity;
               for (const el of candidates) {
                 const ap = el.getAttribute('aria-pressed');
@@ -750,7 +761,7 @@
                   const prevOn = lastOnState.get(el) === true;
                   if (prevOn) continue; // already ON previously; not a rising edge
                   const ts2 = processedButtonsTS.get(el);
-                  if (ts2 && (now2 - ts2) < 1500) continue;
+                  if (ts2 && (now2 - ts2) < BUTTON_DEDUPE_WINDOW) continue;
                   if (recentEnough && el.getBoundingClientRect) {
                     const r = el.getBoundingClientRect();
                     const cx = r.left + r.width/2, cy = r.top + r.height/2;
@@ -772,18 +783,18 @@
                 processClick(best, siteConfig);
               }
             } catch (_) { }
-          }, 150);
+          }, REDDIT_SCAN_DELAY);
         }
       };
-      // Listen on multiple event types to handle sites that prevent default click
-      const eventsToListen = ['click', 'pointerup', 'mousedown'];
-      for (const evt of eventsToListen) {
-        document.addEventListener(evt, handleInputEvent, true);
-      }
+    // Listen on multiple event types to handle sites that prevent default click
+    const eventsToListen = ['click', 'pointerup', 'mousedown'];
+    for (const evt of eventsToListen) {
+      document.addEventListener(evt, handleInputEvent, true);
+    }
 
-      // For Reddit specifically, also observe aria-* attribute changes to catch
-      // state toggles that don't surface as input events (Shadow DOM, etc.).
-      if (host === 'reddit.com') {
+    // For Reddit specifically, also observe aria-* attribute changes to catch
+    // state toggles that don't surface as input events (Shadow DOM, etc.).
+    if (host === 'reddit.com') {
         const seen = new WeakSet();
         const matchesAny = (el) => {
           if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
@@ -901,14 +912,13 @@
 
         // Last-resort polling fallback (closed shadow roots, missed events)
         try {
-          const POLL_MS = 800;
           setInterval(() => {
             try {
               const sels = buttonSelectors.filter(Boolean).join(', ');
               if (!sels) return;
               const list = Array.from(document.querySelectorAll(sels));
               const now3 = Date.now();
-              const recentEnough = (now3 - LAST_EVENT.time) < 3000;
+              const recentEnough = (now3 - LAST_EVENT.time) < REDDIT_POINTER_MAX_AGE;
               let best = null; let bestDist = Infinity;
               for (const el of list) {
                 try {
@@ -918,7 +928,7 @@
                     const prevOn = lastOnState.get(el) === true;
                     if (prevOn) continue; // not a rising edge
                     const ts = processedButtonsTS.get(el);
-                    if (ts && (now3 - ts) < 1500) continue;
+                    if (ts && (now3 - ts) < BUTTON_DEDUPE_WINDOW) continue;
                     if (recentEnough && el.getBoundingClientRect) {
                       const r = el.getBoundingClientRect();
                       const cx = r.left + r.width/2, cy = r.top + r.height/2;
@@ -938,20 +948,19 @@
                 processClick(best, siteConfig);
               }
             } catch (_) { }
-          }, POLL_MS);
+          }, REDDIT_POLL_INTERVAL);
         } catch (_) { }
-      }
-      // Listen for responses from the background
-      chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        if (message && message.type === 'saveResult') {
-          if (message.status === 'success') {
-            showToast('Saved to Raindrop.io!', true);
-          } else {
-            showToast(message.error || 'Error saving bookmark.', false);
-            if (DEBUG) console.debug('[Raindrop CS] Save error', message);
-          }
+    }
+    // Listen for responses from the background
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message && message.type === 'saveResult') {
+        if (message.status === 'success') {
+          showToast('Saved to Raindrop.io!', true);
+        } else {
+          showToast(message.error || 'Error saving bookmark.', false);
+          if (DEBUG) console.debug('[Raindrop CS] Save error', message);
         }
-      });
+      }
     });
   }
 

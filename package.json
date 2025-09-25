@@ -1,0 +1,21 @@
+{
+  "name": "raindrop_extension",
+  "version": "1.0.0",
+  "description": "Chrome extension that saves liked social content to Raindrop.io collections.",
+  "type": "module",
+  "scripts": {
+    "clean": "rimraf dist",
+    "build": "npm run clean && node build/build.mjs",
+    "dev": "node build/build.mjs --watch"
+  },
+  "keywords": [
+    "chrome-extension",
+    "raindrop"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.21.5",
+    "rimraf": "^5.0.7"
+  }
+}

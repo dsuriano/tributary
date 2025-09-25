@@ -9,7 +9,7 @@ Save interesting content from your social feeds straight into your Raindrop.io c
 * **Non‑intrusive feedback** – toast notifications let you know when a bookmark is saved or if an error occurs.
 * **Configurable defaults** – choose a default Raindrop.io collection and tags to apply to every bookmark.
 * **Per‑site enable/disable** – toggle the extension on specific domains from the options page without editing code.
-* **Extensible site config + hooks** – add support for new sites by editing a single configuration file (`scripts/site_selectors.js`) with selectors and optional per‑site hooks.
+* **Extensible site config + hooks** – add support for new sites by editing a single configuration file (`src/scripts/site_selectors.js`) with selectors and optional per‑site hooks.
 
 ## Installation
 
@@ -22,20 +22,44 @@ Save interesting content from your social feeds straight into your Raindrop.io c
 
 ```
 raindrop_extension/
-├─ scripts/
-│  ├─ content_script.js        # Core logic running on supported sites
-│  ├─ background.js            # Service worker: calls Raindrop API
-│  └─ site_selectors.js        # Site config: selectors + optional hooks
-├─ options/
-│  ├─ options.html             # Options UI
-│  ├─ options.css              # Options styles
-│  └─ options.js               # Options logic
+├─ build/                      # esbuild runner script (build.mjs)
+├─ dist/                       # Compiled extension output (generated)
 ├─ icons/                      # Extension icons
-├─ manifest.json               # Chrome MV3 manifest
+├─ options/                    # Static HTML/CSS copied into dist/
+├─ src/
+│  ├─ config/
+│  │  ├─ constants.js          # Shared API endpoints, timings, UI copy
+│  │  └─ storage.js            # Promise-based helpers around chrome.storage
+│  └─ scripts/
+│     ├─ background.js        # Service worker: Raindrop API integration
+│     ├─ content_script.js    # In-page interaction logic
+│     └─ site_selectors.js    # Site config map and hooks
+├─ manifest.json               # Chrome MV3 manifest (type: module)
+├─ package.json                # Tooling & npm scripts
 ├─ LICENSE                     # MIT license
 ├─ CONTRIBUTING.md             # Contribution guide
 └─ CODE_OF_CONDUCT.md          # Community guidelines
 ```
+
+> **Note**: Source files live under `src/`. Run `npm run build` to produce the bundled extension inside `dist/` before loading it into Chrome.
+
+## Getting Started (Development)
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Produce a fresh build (outputs to `dist/`):
+   ```bash
+   npm run build
+   ```
+3. For iterative work, run the watcher to rebuild on change:
+   ```bash
+   npm run dev
+   ```
+4. Load the extension from the `dist/` directory via `chrome://extensions` → **Load unpacked**.
+
+The build pipeline uses `esbuild` with an asset-copy plugin so that bundled JavaScript and static assets are always in sync. `npm run clean` removes the `dist/` directory.
 
 ## Generating a Raindrop.io Test Token
 
@@ -72,34 +96,32 @@ A toast message will appear briefly confirming that the bookmark was saved. If t
 
 The content script is injected into each supported site when pages finish loading. It loads a configuration object from `scripts/site_selectors.js` to determine which buttons and containers to observe. Rather than relying on brittle CSS classes, the configuration uses stable attributes such as `data-testid` and `aria-label` to find the correct elements.
 
-Each site can also provide small hook functions to customize behavior without touching the core code:
+Each site can also provide small hook functions to customize behavior without touching the core code. See `src/scripts/site_selectors.js` for examples:
 
 - `hooks.toggledOnAfterClick(button)`: return true only when a click toggles the positive state (like/upvote on)
 - `hooks.getPermalink(button)`: return a canonical permalink; otherwise a generic extractor finds external links or falls back to canonical/current URL
 - `hooks.getTitle(button)`: override the title
 - `hooks.getExcerpt(button)`: override the excerpt/summary
 
-Once a native like/upvote button is clicked, the script:
+When a supported like/upvote button is clicked, the flow is:
 
-1. Debounces the event to avoid duplicate requests from rapid clicks.
-2. Traverses up the DOM to find the nearest container element as defined in the configuration.
-3. Searches within that container for the first `<a>` tag whose domain differs from the current site. If found, that URL becomes the bookmark.
-4. If no external link is found, falls back to the page’s canonical URL (from `<link rel="canonical">`) or `window.location.href`.
-5. Sends a message to the background script with the URL, page title and a short excerpt.
-6. Uses site hooks to compute permalink/title/excerpt when available.
-7. Displays a toast notification while waiting for the result.
+1. Debounce the event to avoid duplicate requests from rapid clicks.
+2. Traverse up the DOM to find the nearest container element as defined in the configuration.
+3. Search within that container for the first `<a>` tag whose domain differs from the current site. If found, that URL becomes the bookmark.
+4. If no external link is found, fall back to the page’s canonical URL (from `<link rel="canonical">`) or `window.location.href`.
+5. Send a message to the background script with the URL, page title and a short excerpt.
+6. Use site hooks to compute permalink/title/excerpt when available.
+7. Display a toast notification while waiting for the result.
 
 ### Background Script
 
-The service worker listens for messages and uses the Raindrop.io API to create bookmarks. When a `save` message arrives, it retrieves the stored API token, default collection and tags from `chrome.storage.local`, constructs a POST request and calls `POST https://api.raindrop.io/rest/v1/raindrop`【626947988996100†L98-L103】 with the bookmark details. If the call succeeds the response contains a `result: true` flag and the worker notifies the content script of success. A 429 response triggers a simple 60‑second backoff, while a 401 response indicates an invalid token. The worker also provides helper actions to fetch collections (`GET https://api.raindrop.io/rest/v1/collections`【844453685848287†L74-L79】 and `GET https://api.raindrop.io/rest/v1/collections/childrens`【844453685848287†L118-L124】) and validate tokens.
+The service worker (`src/scripts/background.js`) listens for messages and uses the Raindrop.io API to create bookmarks. When a `save` message arrives, it reads the token, default collection/tags, and debug flag via the shared storage helpers. It then calls `POST https://api.raindrop.io/rest/v1/raindrop` with the bookmark details. A 429 response triggers a configurable backoff window, while a 401 response clears the invalid token from storage and surfaces an error toast. The worker also exposes `getCollections` (`GET https://api.raindrop.io/rest/v1/collections` and `GET https://api.raindrop.io/rest/v1/collections/childrens`) and `validateToken` actions for the options UI.
 
 ### Options Page
 
 The options page is a single HTML document styled with plain CSS. It dynamically loads the list of supported domains from `site_selectors.js` and builds a set of checkboxes. When a test token is entered and saved, the page sends a `validateToken` message to the background worker. If valid, a `getCollections` message is sent to fetch all collections, which are then displayed in a dropdown. The selected settings are persisted to `chrome.storage.local` and read by both the content and background scripts.
 
-## Adding Support for New Sites
-
-To add another website, edit `scripts/site_selectors.js`. Each entry maps a domain name (no `www`) to a **button selector** and a **container selector**, plus optional **hooks**.
+To add another website, edit `src/scripts/site_selectors.js`. Each entry maps a domain name (no `www`) to a **button selector** and a **container selector**, plus optional **hooks**.
 
 Example:
 

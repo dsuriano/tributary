@@ -1,3 +1,6 @@
+import { CONFIG, STORAGE_KEYS, TIMING, UI_COPY } from '../config/constants.js';
+import { getFromStorage, removeFromStorage } from '../config/storage.js';
+
 // Background service worker for the Social Media to Raindrop.io extension.
 //
 // This service worker listens for messages from content scripts and the
@@ -7,24 +10,11 @@
 // responses from the API. All asynchronous operations are handled
 // using async/await for clarity.
 
-const API_BASE = 'https://api.raindrop.io/rest/v1';
-
 // Timestamp until which requests should be deferred due to rate
 // limiting. When a 429 response is encountered this is set to now +
-// 60 seconds. Subsequent save attempts within this window will be
-// rejected with a rate limit error without making a network call.
+// the configured backoff. Subsequent save attempts within this window
+// will be rejected with a rate limit error without making a network call.
 let backoffUntil = 0;
-
-/**
- * Helper to read values from chrome.storage.local as a promise.
- * @param {string[]} keys Array of keys to retrieve.
- * @returns {Promise<Object>} The retrieved values.
- */
-function getStorage(keys) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(keys, resolve);
-  });
-}
 
 /**
  * Perform a request to the Raindrop API with the given endpoint and
@@ -37,7 +27,7 @@ function getStorage(keys) {
  * @param {string} token OAuth token for the API.
  */
 async function raindropFetch(endpoint, options = {}, token) {
-  const url = API_BASE + endpoint;
+  const url = CONFIG.API_BASE + endpoint;
   const headers = options.headers ? { ...options.headers } : {};
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -56,14 +46,23 @@ async function raindropFetch(endpoint, options = {}, token) {
  * @param {chrome.tabs.Tab} tab Tab from which the request originated.
  */
 async function handleSave(data, tab) {
-  const { raindropToken, defaultCollection, defaultTags, debugLogging } = await getStorage(['raindropToken', 'defaultCollection', 'defaultTags', 'debugLogging']);
+  const stored = await getFromStorage([
+    STORAGE_KEYS.TOKEN,
+    STORAGE_KEYS.DEFAULT_COLLECTION,
+    STORAGE_KEYS.DEFAULT_TAGS,
+    STORAGE_KEYS.DEBUG_LOGGING
+  ]);
+  const raindropToken = stored[STORAGE_KEYS.TOKEN];
+  const defaultCollection = stored[STORAGE_KEYS.DEFAULT_COLLECTION];
+  const defaultTags = stored[STORAGE_KEYS.DEFAULT_TAGS];
+  const debugLogging = stored[STORAGE_KEYS.DEBUG_LOGGING];
   if (!raindropToken) {
-    chrome.tabs.sendMessage(tab.id, { type: 'saveResult', status: 'error', error: 'API token not set.' });
+    chrome.tabs.sendMessage(tab.id, { type: 'saveResult', status: 'error', error: UI_COPY.TOKEN_NOT_SET });
     return;
   }
   const now = Date.now();
   if (now < backoffUntil) {
-    chrome.tabs.sendMessage(tab.id, { type: 'saveResult', status: 'error', error: 'Rate limited. Please try again shortly.' });
+    chrome.tabs.sendMessage(tab.id, { type: 'saveResult', status: 'error', error: UI_COPY.RATE_LIMIT_ERROR });
     return;
   }
   // Build request body
@@ -92,13 +91,14 @@ async function handleSave(data, tab) {
     }
     if (response.status === 429) {
       // Too many requests – apply backoff
-      backoffUntil = Date.now() + 60 * 1000;
-      chrome.tabs.sendMessage(tab.id, { type: 'saveResult', status: 'error', error: 'Rate limited. Please try again later.' });
+      backoffUntil = Date.now() + TIMING.RATE_LIMIT_BACKOFF_MS;
+      chrome.tabs.sendMessage(tab.id, { type: 'saveResult', status: 'error', error: UI_COPY.RATE_LIMIT_ERROR });
       return;
     }
     if (response.status === 401) {
       // Invalid token
-      chrome.tabs.sendMessage(tab.id, { type: 'saveResult', status: 'error', error: 'Invalid API token.' });
+      await removeFromStorage(STORAGE_KEYS.TOKEN);
+      chrome.tabs.sendMessage(tab.id, { type: 'saveResult', status: 'error', error: UI_COPY.TOKEN_INVALID });
       return;
     }
     if (!response.ok) {
@@ -125,9 +125,10 @@ async function handleSave(data, tab) {
  * @param {Function} sendResponse Function to call with the result or error.
  */
 async function handleGetCollections(sendResponse) {
-  const { raindropToken } = await getStorage(['raindropToken']);
+  const stored = await getFromStorage([STORAGE_KEYS.TOKEN]);
+  const raindropToken = stored[STORAGE_KEYS.TOKEN];
   if (!raindropToken) {
-    sendResponse({ error: 'API token not set.' });
+    sendResponse({ error: UI_COPY.TOKEN_NOT_SET });
     return;
   }
   try {
@@ -136,6 +137,7 @@ async function handleGetCollections(sendResponse) {
     // Root collections
     let resRoot = await raindropFetch('/collections', { method: 'GET', headers }, raindropToken);
     if (resRoot.status === 401) {
+      await removeFromStorage(STORAGE_KEYS.TOKEN);
       sendResponse({ error: 'unauthorized' });
       return;
     }
@@ -149,7 +151,22 @@ async function handleGetCollections(sendResponse) {
       const data = await resChild.json();
       collections = collections.concat(data.items || []);
     }
-    sendResponse({ collections });
+    // Deduplicate collections by _id in case the same collection
+    // appears in both root and child responses.
+    const seenIds = new Set();
+    const dedupedCollections = [];
+    for (const collection of collections) {
+      if (!collection || typeof collection._id === 'undefined' || collection._id === null) {
+        dedupedCollections.push(collection);
+        continue;
+      }
+      if (seenIds.has(collection._id)) {
+        continue;
+      }
+      seenIds.add(collection._id);
+      dedupedCollections.push(collection);
+    }
+    sendResponse({ collections: dedupedCollections });
   } catch (err) {
     sendResponse({ error: 'Network error.' });
   }
@@ -162,7 +179,8 @@ async function handleGetCollections(sendResponse) {
  * @param {Function} sendResponse Callback to return the validation result.
  */
 async function handleValidateToken(sendResponse) {
-  const { raindropToken } = await getStorage(['raindropToken']);
+  const stored = await getFromStorage([STORAGE_KEYS.TOKEN]);
+  const raindropToken = stored[STORAGE_KEYS.TOKEN];
   if (!raindropToken) {
     sendResponse({ valid: false });
     return;
@@ -170,6 +188,7 @@ async function handleValidateToken(sendResponse) {
   try {
     const res = await raindropFetch('/user', { method: 'GET' }, raindropToken);
     if (res.status === 401) {
+      await removeFromStorage(STORAGE_KEYS.TOKEN);
       sendResponse({ valid: false });
     } else {
       sendResponse({ valid: res.ok });
