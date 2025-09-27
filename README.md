@@ -31,11 +31,11 @@ Save interesting content from your social feeds straight into your Raindrop.io c
 
 1.  **Clone the Repository**
 
-    Clone or download this repository, then open a terminal inside the `tributary/` directory.
+    Clone or download this repository, then open a terminal inside the project directory.
 
     ```bash
-    git clone https://github.com/<your-org>/tributary.git
-    cd tributary
+    git clone https://github.com/<your-org>/<your-repo>.git
+    cd <your-repo>
     ```
 
 2.  **Install Dependencies**
@@ -48,13 +48,13 @@ Save interesting content from your social feeds straight into your Raindrop.io c
 
 3.  **Build the Extension**
 
-    Run the build script to compile the source files and package them into the `dist/` directory.
+    Build the source into the `dist/` directory.
 
     ```bash
     npm run build
     ```
 
-    For development, you can run the watcher to automatically rebuild the extension whenever you make changes to the source files:
+    For development, you can run the watcher to automatically rebuild whenever files change:
 
     ```bash
     npm run dev
@@ -62,16 +62,17 @@ Save interesting content from your social feeds straight into your Raindrop.io c
 
 4.  **Load the Extension in Chrome**
 
-    a.  Open Google Chrome and navigate to `chrome://extensions/`.
-    b.  Toggle **Developer mode** on in the top-right corner.
-    c.  Click **Load unpacked** and select the `dist/` directory from this project.
-    d.  The extension will appear in your list. Pin it to the toolbar for easy access.
-    e.  If you are running the `dev` watcher, simply click the **Refresh** button on the extension card in `chrome://extensions/` to load your changes.
+    a. Open Google Chrome and navigate to `chrome://extensions/`.
+    b. Toggle **Developer mode** on in the top-right corner.
+    c. Click **Load unpacked** and select the `dist/` directory from this project.
+    d. The extension will appear in your list. Pin it to the toolbar for easy access.
+    e. If you are running the `dev` watcher, click the **Refresh** button on the extension card in `chrome://extensions/` to load your changes.
 
 ### Project Structure
 
 ```
 tributary/
+├─ assets/                      # Project assets (e.g., README banner)
 ├─ build/                       # esbuild runner script (build.mjs)
 ├─ dist/                        # Compiled extension output (generated)
 ├─ icons/                       # Extension icons
@@ -80,6 +81,8 @@ tributary/
 │  ├─ config/
 │  │  ├─ constants.js           # Shared API endpoints, timings, UI copy
 │  │  └─ storage.js             # Promise-based helpers around chrome.storage
+│  ├─ options/
+│  │  └─ options.js            # Options page script (bundled to dist/options)
 │  └─ scripts/
 │     ├─ background.js         # Service worker: Raindrop API integration
 │     ├─ content_script.js     # In-page interaction logic
@@ -94,15 +97,30 @@ tributary/
 ├─ LICENSE                      # MIT license
 ├─ CONTRIBUTING.md              # Contribution guide
 └─ CODE_OF_CONDUCT.md           # Community guidelines
-```
 
 > **Note**: Source files are located in the `src/` directory. Run `npm run build` to produce the bundled extension inside `dist/` before loading it into Chrome.
 
-To allow the extension to create bookmarks, you need a **test token** from Raindrop.io:
+### Permissions
 
-1.  Log in to your Raindrop.io account.
-2.  Go to **Settings → Integrations** and locate the **API** section.
-3.  Click **Get test token** and copy the generated token. This token is used as a Bearer token in the `Authorization` header for every API call.
+ The extension requests the minimal set of Chrome permissions needed to function, as defined in `manifest.json`:
+
+- `permissions`
+  - `storage`
+- `host_permissions`
+  - `*://*.twitter.com/*`
+  - `*://*.x.com/*`
+  - `*://*.youtube.com/*`
+  - `*://*.reddit.com/*`
+  - `https://api.raindrop.io/*`
+- `options_page`
+  - `options/options.html`
+- `web_accessible_resources`
+  - `scripts/sites/index.js`, `scripts/sites/*.js` (for dynamic provider loading)
+
+ To allow the extension to create bookmarks, you need a **test token** from Raindrop.io:
+ 1. Log in to your Raindrop.io account.
+ 2. Go to **Settings → Integrations** and locate the **API** section.
+ 3. Click **Get test token** and copy the generated token. This token is used as a Bearer token in the `Authorization` header for every API call.
 
 Test tokens are scoped to your account and can be revoked at any time. Store it carefully; the extension only saves it locally using `chrome.storage.local`.
 

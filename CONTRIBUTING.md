@@ -1,14 +1,19 @@
 # Contributing
 
-Thanks for your interest in contributing! This project is a simple, zero-build Chrome extension. We welcome improvements and new site support.
+Thanks for your interest in contributing! This project uses an esbuild-based workflow and a modular site provider architecture. We welcome improvements and new site support.
 
 ## Local development
 
+- Requirements: Node.js 18+ and npm 9+
+- Install dependencies:
+  - `npm install`
+- Start the dev watcher (rebuilds on change):
+  - `npm run dev`
 - Load the extension unpacked:
   - Open `chrome://extensions`
   - Enable Developer Mode
-  - Click "Load unpacked" and select the `tributary/` directory
-- No build step is required. Edit files directly and refresh the extension.
+  - Click "Load unpacked" and select the `dist/` directory (built output)
+- During development, after changes rebuild, click the Refresh icon on the extension card in `chrome://extensions`.
 
 ## Code style
 
@@ -18,20 +23,13 @@ Thanks for your interest in contributing! This project is a simple, zero-build C
 
 ## Adding a new site
 
-Add a new entry to `scripts/site_selectors.js` under the domain key (no `www`). Provide:
+Add a new provider module under `src/scripts/sites/` and register it in the registry at `src/scripts/sites/index.js`.
 
-- `buttonSelector`: CSS selector(s) for the native like/upvote/bookmark control
-- `containerSelector`: CSS selector(s) for the content container
-- Optional `hooks` to customize behavior without touching core code:
-  - `toggledOnAfterClick(button)`: return true only when click toggles the positive state
-  - `getPermalink(button)`: return a canonical permalink for the item
-  - `getTitle(button)`: return a good title
-  - `getExcerpt(button)`: return an excerpt/summary
-
-Example:
+1) Create a file, e.g. `src/scripts/sites/example.js`:
 
 ```js
-"example.com": {
+// Example provider for example.com
+const example = {
   buttonSelector: 'button[aria-label="Like"]',
   containerSelector: ['article', 'div.post'],
   hooks: {
@@ -42,22 +40,38 @@ Example:
     },
     getPermalink: (button) => {
       const container = button.closest('article') || document;
-      const a = container.querySelector('a[href^="http"]')
+      const a = container.querySelector('a[href^="http"]');
       return a ? a.href : '';
     },
-    getTitle: () => (document.title || '').slice(0, 200),
+    getTitle: () => document.title || '',
     getExcerpt: (button) => {
       const container = button.closest('article') || document;
       return (container.textContent || '').trim().slice(0, 500);
     }
   }
-}
+};
+
+export default example;
 ```
 
-Also update `manifest.json` if needed:
+2) Register it in `src/scripts/sites/index.js`:
 
-- Add the domain to `host_permissions`
-- Add the match pattern to `content_scripts[0].matches`
+```js
+const providers = [
+  { match: ['twitter.com', 'x.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/twitter.js')) },
+  { match: ['youtube.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/youtube.js')) },
+  { match: ['reddit.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/reddit.js')) },
+  { match: ['example.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/example.js')) },
+];
+```
+
+Notes:
+
+- Wildcards are supported in `match` via patterns like `*.medium.com`.
+- Rebuild (`npm run build`) and reload the extension. Ensure the new domain appears under Enabled Domains on the Options page.
+- Update `manifest.json` if needed:
+  - Add the domain to `host_permissions`
+  - Add the match pattern to `content_scripts[0].matches`
 
 Reload the extension, enable the new domain in the Options page, and test.
 
