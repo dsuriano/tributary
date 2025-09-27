@@ -12,7 +12,7 @@ Save interesting content from your social feeds straight into your Raindrop.io c
 -   **Friendly Confirmations:** Lightweight toast messages celebrate every success and surface issues before they slow you down.
 -   **Personalized Defaults:** Set your go-to collection and tags once, and every bookmark will land in the perfect spot.
 -   **Domain-Level Control:** Use the options page to pause or resume the extension on individual sites with no code edits required.
--   **Built for Expansion:** Add support for more communities in minutes by adding new selectors or optional hooks into `src/scripts/site_selectors.js`.
+-   **Built for Expansion:** Add support for more communities in minutes using modular site providers under `src/scripts/sites/` with a lightweight registry.
 
 ### Why Use This Extension?
 
@@ -72,23 +72,28 @@ Save interesting content from your social feeds straight into your Raindrop.io c
 
 ```
 tributary/
-├─ build/                      # esbuild runner script (build.mjs)
-├─ dist/                       # Compiled extension output (generated)
-├─ icons/                      # Extension icons
-├─ options/                    # Static HTML/CSS copied into dist/
+├─ build/                       # esbuild runner script (build.mjs)
+├─ dist/                        # Compiled extension output (generated)
+├─ icons/                       # Extension icons
+├─ options/                     # Static HTML/CSS copied into dist/
 ├─ src/
 │  ├─ config/
-│  │  ├─ constants.js          # Shared API endpoints, timings, UI copy
-│  │  └─ storage.js            # Promise-based helpers around chrome.storage
+│  │  ├─ constants.js           # Shared API endpoints, timings, UI copy
+│  │  └─ storage.js             # Promise-based helpers around chrome.storage
 │  └─ scripts/
-│     ├─ background.js        # Service worker: Raindrop API integration
-│     ├─ content_script.js    # In-page interaction logic
-│     └─ site_selectors.js    # Site config map and hooks
-├─ manifest.json               # Chrome MV3 manifest (type: module)
-├─ package.json                # Tooling & npm scripts
-├─ LICENSE                     # MIT license
-├─ CONTRIBUTING.md             # Contribution guide
-└─ CODE_OF_CONDUCT.md          # Community guidelines
+│     ├─ background.js         # Service worker: Raindrop API integration
+│     ├─ content_script.js     # In-page interaction logic
+│     └─ sites/                # Modular site providers + registry
+│        ├─ index.js           # Hostname -> provider registry (lazy-loaded)
+│        ├─ twitter.js         # Twitter/X provider
+│        ├─ youtube.js         # YouTube provider
+│        ├─ reddit.js          # Reddit provider
+│        └─ generic.js         # Fallback provider
+├─ manifest.json                # Chrome MV3 manifest (type: module)
+├─ package.json                 # Tooling & npm scripts
+├─ LICENSE                      # MIT license
+├─ CONTRIBUTING.md              # Contribution guide
+└─ CODE_OF_CONDUCT.md           # Community guidelines
 ```
 
 > **Note**: Source files are located in the `src/` directory. Run `npm run build` to produce the bundled extension inside `dist/` before loading it into Chrome.
@@ -124,7 +129,7 @@ A toast message will appear briefly confirming that the bookmark was saved. If t
 
 #### Content Script
 
-The content script is injected into each supported site when the page finishes loading. It uses a configuration object from `scripts/site_selectors.js` to determine which buttons and containers to observe. Rather than relying on brittle CSS classes, the configuration uses stable attributes such as `data-testid` and `aria-label` to find the correct elements.
+The content script is injected into each supported site when the page finishes loading. It lazily imports a site-specific provider via the registry in `scripts/sites/index.js` based on the current hostname. Rather than relying on brittle CSS classes, providers prefer stable attributes such as `data-testid` and `aria-label` to find the correct elements.
 
 When a supported button is clicked, the following occurs:
 
@@ -135,7 +140,7 @@ When a supported button is clicked, the following occurs:
 5.  A message containing the URL, page title, and a short excerpt is sent to the background script.
 6.  A toast notification is displayed while awaiting the result.
 
-Each site can also provide small hook functions to customize behavior. See `src/scripts/site_selectors.js` for examples:
+Each site provider can also expose small hook functions to customize behavior. See `src/scripts/sites/twitter.js`, `src/scripts/sites/youtube.js`, or `src/scripts/sites/reddit.js` for examples:
 
 -   `hooks.toggledOnAfterClick(button)`: Returns `true` only when a click toggles the positive state (e.g., the like button is now "on").
 -   `hooks.getPermalink(button)`: Returns a canonical permalink.
@@ -148,19 +153,15 @@ The service worker (`src/scripts/background.js`) listens for messages and uses t
 
 #### Adding a New Website
 
-To add another website, edit `src/scripts/site_selectors.js`. Each entry maps a domain name to a `buttonSelector` and a `containerSelector`, plus optional `hooks`.
+To add another website, create a provider file under `src/scripts/sites/` and register it in `src/scripts/sites/index.js`.
 
-**Example:**
+**Example provider (`src/scripts/sites/example.js`):**
 
-javascript
-
-```
-"example.com": {
-  // CSS selector for the native like/upvote button
+```js
+// Example provider for example.com
+const example = {
   buttonSelector: 'button[aria-label="Like"]',
-  // Selector(s) for the element that wraps the entire post
   containerSelector: ['article', 'div.post'],
-  // Optional hooks for site-specific logic
   hooks: {
     toggledOnAfterClick: async (button) => {
       await new Promise(r => setTimeout(r, 80));
@@ -171,9 +172,27 @@ javascript
       const container = button.closest('article') || document;
       const a = container.querySelector('a[href^="http"]');
       return a ? a.href : '';
+    },
+    getTitle: () => document.title || '',
+    getExcerpt: (button) => {
+      const container = button.closest('article') || document;
+      return (container.textContent || '').trim().slice(0, 500);
     }
   }
-}
+};
+
+export default example;
+```
+
+**Register it (`src/scripts/sites/index.js`):**
+
+```js
+const providers = [
+  { match: ['twitter.com', 'x.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/twitter.js')) },
+  { match: ['youtube.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/youtube.js')) },
+  { match: ['reddit.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/reddit.js')) },
+  { match: ['example.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/example.js')) },
+];
 ```
 
 **Guidelines:**
@@ -181,7 +200,33 @@ javascript
 -   Use stable attributes like `data-testid` or `aria-label` when possible.
 -   Prefer returning stable permalinks in the `getPermalink` hook.
 -   Keep hooks small and resilient to prevent errors from missing nodes.
--   After editing the file, reload the extension and ensure the new domain is enabled in the Options page and added to `manifest.json`.
+-   Rebuild (`npm run build`) and reload the extension. Ensure the new domain shows up under Enabled Domains in the Options page (which reads from the registry) and is included in `manifest.json` `host_permissions`/`content_scripts.matches` if needed.
+
+#### Provider Template
+
+For a quick start, copy the template at `src/scripts/sites/_template.js` to a new file (e.g., `src/scripts/sites/example.js`) and adjust selectors/hooks. Then register it in `src/scripts/sites/index.js`.
+
+The template includes sensible defaults for:
+
+- `buttonSelector`
+- `containerSelector`
+- `hooks.toggledOnAfterClick`
+- `hooks.getPermalink`
+- `hooks.getTitle`
+- `hooks.getExcerpt`
+
+#### Wildcard Domains
+
+The registry supports wildcard domain patterns in `match`, e.g. `*.medium.com`. Wildcards match the apex and any subdomain. Examples:
+
+```js
+const providers = [
+  // Matches medium.com and any subdomain like blog.medium.com
+  { match: ['*.medium.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/medium.js')) },
+  // Matches the apex exactly
+  { match: ['example.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/example.js')) },
+];
+```
 
 ### Known Limitations
 

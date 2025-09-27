@@ -38,7 +38,10 @@
   "options_page": "options/options.html",
   "web_accessible_resources": [
     {
-      "resources": ["scripts/site_selectors.js"],
+      "resources": [
+        "scripts/sites/index.js",
+        "scripts/sites/*.js"
+      ],
       "matches": ["<all_urls>"]
     }
   ]

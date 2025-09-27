@@ -1,7 +1,7 @@
 import { CONFIG, STORAGE_KEYS, TIMING, UI_COPY } from '../config/constants.js';
 import { getFromStorage, removeFromStorage } from '../config/storage.js';
 
-// Background service worker for the Social Media to Raindrop.io extension.
+// Background service worker for the Social Media to Tributary extension.
 //
 // This service worker listens for messages from content scripts and the
 // options page. It communicates with the Raindrop.io REST API to

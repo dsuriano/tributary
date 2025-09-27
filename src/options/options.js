@@ -6,12 +6,16 @@
 // validate the token and fetch available collections.
 
 /**
- * Load the site selector configuration. Used to build the list of
- * domains in the options page.
+ * Load supported domains from the modular site registry for building
+ * the list of domains in the options page.
  */
-async function loadSiteSelectors() {
-  const module = await import(chrome.runtime.getURL('../scripts/site_selectors.js'));
-  return module.default || module.siteSelectors;
+async function loadSupportedDomains() {
+  const mod = await import(chrome.runtime.getURL('scripts/sites/index.js'));
+  const getSupportedDomains = mod.getSupportedDomains || mod.default?.getSupportedDomains;
+  if (typeof getSupportedDomains === 'function') {
+    return getSupportedDomains();
+  }
+  return [];
 }
 
 /**
@@ -86,11 +90,11 @@ async function init() {
   tokenInput.value = stored.raindropToken || '';
   tagsInput.value = Array.isArray(stored.defaultTags) ? stored.defaultTags.join(', ') : '';
   debugCheckbox.checked = !!stored.debugLogging;
-  // Build domain checkboxes
-  const selectors = await loadSiteSelectors();
+  // Build domain checkboxes from the site registry
+  const domains = await loadSupportedDomains();
   const enabled = stored.enabledDomains || {};
   domainsContainer.innerHTML = '';
-  Object.keys(selectors).forEach((domain) => {
+  domains.forEach((domain) => {
     const wrapper = document.createElement('label');
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';

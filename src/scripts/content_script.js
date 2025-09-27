@@ -36,12 +36,18 @@ import { getFromStorage } from '../config/storage.js';
   const preClickOnState = new WeakMap(); // Element -> boolean
 
   /**
-   * Load the site selector configuration from the extension package.
-   * Returns a promise that resolves to the mapping object.
+   * Load the site configuration for the current hostname via the modular site registry.
+   * Returns a promise that resolves to a single SiteConfig object for this host.
    */
   async function loadConfig() {
-    const module = await import(chrome.runtime.getURL('scripts/site_selectors.js'));
-    return module.default || module.siteSelectors;
+    const host = (window.location.hostname || '').replace(/^www\./, '');
+    const module = await import(chrome.runtime.getURL('scripts/sites/index.js'));
+    const loader = module.loadSiteConfigFor || module.default?.loadSiteConfigFor;
+    if (typeof loader === 'function') {
+      return await loader(host);
+    }
+    // If registry is unavailable, return null (unsupported host)
+    return null;
   }
 
   function isYouTubeShortsPage() {
@@ -914,9 +920,8 @@ import { getFromStorage } from '../config/storage.js';
    * handlers.
    */
   async function init() {
-    const configMap = await loadConfig();
     const host = window.location.hostname.replace(/^www\./, '');
-    const siteConfig = configMap[host];
+    const siteConfig = await loadConfig();
     if (!siteConfig) {
       return; // unsupported site
     }

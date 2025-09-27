@@ -51,7 +51,12 @@ async function run({ watch = false } = {}) {
     entryPoints: {
       'scripts/background': 'src/scripts/background.js',
       'scripts/content_script': 'src/scripts/content_script.js',
-      'scripts/site_selectors': 'src/scripts/site_selectors.js',
+      // Site registry + providers (needed for dynamic imports in content script)
+      'scripts/sites/index': 'src/scripts/sites/index.js',
+      'scripts/sites/twitter': 'src/scripts/sites/twitter.js',
+      'scripts/sites/youtube': 'src/scripts/sites/youtube.js',
+      'scripts/sites/reddit': 'src/scripts/sites/reddit.js',
+      'scripts/sites/generic': 'src/scripts/sites/generic.js',
       'options/options': 'src/options/options.js'
     },
     bundle: true,
@@ -59,7 +64,6 @@ async function run({ watch = false } = {}) {
     format: 'esm',
     sourcemap: true,
     target: 'es2020',
-    minify: false,
     platform: 'browser',
     loader: {
       '.js': 'js'
