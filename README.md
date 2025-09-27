@@ -1,5 +1,7 @@
-Social Media to Raindrop.io Chrome Extension
---------------------------------------------
+![Tributary Banner](assets/tributary_banner.png)
+
+Tributary: The Effortless Archive for Raindrop.io
+-------------------------------------------------
 
 Save interesting content from your social feeds straight into your Raindrop.io collections. Once configured, this extension listens for clicks on the native **Like**, **Bookmark**, or **Upvote** buttons on supported websites and automatically creates a bookmark in your Raindrop.io account.
 
@@ -25,44 +27,51 @@ Save interesting content from your social feeds straight into your Raindrop.io c
 -   Node.js 18+ and npm 9+ to run the build tooling.
 -   A Raindrop.io account with access to generate a test token.
 
-### Installation
+## Setup and Installation
 
-1.  Clone or download this repository, then open a terminal inside the `raindrop_extension/` directory.\
-    *Note: You will need to replace `<your-org>` with the correct repository path.*
+1.  **Clone the Repository**
 
-    bash
+    Clone or download this repository, then open a terminal inside the `tributary/` directory.
 
+    ```bash
+    git clone https://github.com/<your-org>/tributary.git
+    cd tributary
     ```
-    git clone https://github.com/<your-org>/raindrop_extension.git
-    cd raindrop_extension
-    ```
 
-2.  Install the JavaScript dependencies.
+2.  **Install Dependencies**
 
-    bash
-    ```
+    Install the necessary Node.js dependencies.
+
+    ```bash
     npm install
     ```
 
-3.  Build the extension bundle and copy static assets into the `dist/` directory. This command removes any previous `dist/` contents and regenerates all necessary assets.
+3.  **Build the Extension**
 
-    bash
-    ```
+    Run the build script to compile the source files and package them into the `dist/` directory.
+
+    ```bash
     npm run build
     ```
 
-4.  Open Google Chrome and navigate to `chrome://extensions/`.
-5.  Toggle **Developer mode** on in the top-right corner of the page.
-6.  Click **Load unpacked**, then browse to and select the freshly generated `dist/` directory.
-7.  Confirm the extension appears in the list. If desired, pin it to the toolbar for quick access.
-8.  When you make code changes later, rerun `npm run build` (or keep `npm run dev` running) and then click the **Refresh** button on the extension card inside `chrome://extensions/`.
+    For development, you can run the watcher to automatically rebuild the extension whenever you make changes to the source files:
+
+    ```bash
+    npm run dev
+    ```
+
+4.  **Load the Extension in Chrome**
+
+    a.  Open Google Chrome and navigate to `chrome://extensions/`.
+    b.  Toggle **Developer mode** on in the top-right corner.
+    c.  Click **Load unpacked** and select the `dist/` directory from this project.
+    d.  The extension will appear in your list. Pin it to the toolbar for easy access.
+    e.  If you are running the `dev` watcher, simply click the **Refresh** button on the extension card in `chrome://extensions/` to load your changes.
 
 ### Project Structure
 
-mipsasm
-
 ```
-raindrop_extension/
+tributary/
 ├─ build/                      # esbuild runner script (build.mjs)
 ├─ dist/                       # Compiled extension output (generated)
 ├─ icons/                      # Extension icons
@@ -83,32 +92,6 @@ raindrop_extension/
 ```
 
 > **Note**: Source files are located in the `src/` directory. Run `npm run build` to produce the bundled extension inside `dist/` before loading it into Chrome.
-
-### Getting Started (Development)
-
-1.  Install dependencies:
-
-    bash
-
-    ```
-    npm install
-    ```
-
-2.  Produce a fresh build, which outputs to the `dist/` directory:
-
-    bash
-    ```
-    npm run build
-    ```
-
-3.  For iterative work, run the watcher to rebuild automatically on changes:
-
-    bash
-    ```
-    npm run dev
-    ```
-
-4.  Load the extension from the `dist/` directory via `chrome://extensions` → **Load unpacked**.
 
 To allow the extension to create bookmarks, you need a **test token** from Raindrop.io:
 
@@ -131,9 +114,9 @@ When configured correctly, the status indicator will show **Connected** and your
 
 ### Using the Extension
 
--   **On Twitter/X**, click the ❤️ **Like** button beneath a tweet. The extension climbs the DOM to find the enclosing `<article>` and looks for the first external link. If found, that link is bookmarked. Otherwise, the canonical tweet URL is saved.
--   **On YouTube**, click the 👍 **Like** button beneath a video. The canonical video URL is saved.
--   **On Reddit**, click the ⬆️ **Upvote** button on a post. The script inspects the post container for an external link; if none exists, the post URL is used.
+-   **On Twitter/X**, click the ❤️ **Like** button beneath a tweet. 
+-   **On YouTube**, click the 👍 **Like** button beneath a video. 
+-   **On Reddit**, click the ⬆️ **Upvote** button on a post. 
 
 A toast message will appear briefly confirming that the bookmark was saved. If the API token is invalid or the Raindrop.io API returns an error (including 429 rate limits), the toast will display an error message.
 

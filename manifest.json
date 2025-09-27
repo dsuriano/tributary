@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Social Media to Raindrop.io",
+  "name": "Tributary",
   "version": "1.0.0",
-  "description": "Bookmark content from social media sites directly into your Raindrop.io account by simply liking, upvoting or bookmarking posts.",
+  "description": "The effortless archive for Raindrop.io. Save content from social media sites to your Raindrop.io account by simply liking, upvoting, or bookmarking posts.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

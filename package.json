@@ -1,7 +1,7 @@
 {
-  "name": "raindrop_extension",
+  "name": "tributary",
   "version": "1.0.0",
-  "description": "Chrome extension that saves liked social content to Raindrop.io collections.",
+  "description": "Tributary: The effortless archive for Raindrop.io.",
   "type": "module",
   "scripts": {
     "clean": "rimraf dist",
@@ -10,12 +10,13 @@
   },
   "keywords": [
     "chrome-extension",
-    "raindrop"
+    "raindrop",
+    "tributary"
   ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "esbuild": "^0.21.5",
+    "esbuild": "^0.25.10",
     "rimraf": "^5.0.7"
   }
 }

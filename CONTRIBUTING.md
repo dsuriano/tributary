@@ -7,7 +7,7 @@ Thanks for your interest in contributing! This project is a simple, zero-build C
 - Load the extension unpacked:
   - Open `chrome://extensions`
   - Enable Developer Mode
-  - Click "Load unpacked" and select the `raindrop_extension/` directory
+  - Click "Load unpacked" and select the `tributary/` directory
 - No build step is required. Edit files directly and refresh the extension.
 
 ## Code style
