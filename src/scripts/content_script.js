@@ -1,7 +1,7 @@
 import { TIMING, STORAGE_KEYS } from '../config/constants.js';
 import { getFromStorage } from '../config/storage.js';
 
-// Content script for the Social Media to Raindrop.io extension.
+// Content script for the Tributary extension.
 //
 // This script is injected into supported social media sites (Twitter/X,
 // YouTube, Reddit) and listens for clicks on the native like/upvote

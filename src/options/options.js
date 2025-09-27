@@ -1,4 +1,4 @@
-// Options page script for the Social Media to Raindrop.io extension.
+// Options page script for the Tributary extension.
 //
 // This script handles loading and saving user preferences such as the
 // Raindrop API token, default collection, default tags and enabled
