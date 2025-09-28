@@ -797,11 +797,11 @@ import { getFromStorage } from '../config/storage.js';
         const hookResult = !!(await hooks.toggledOnAfterClick(button));
         if (hookResult) {
           toggledOn = true;
-          if (DEBUG) console.debug('[Raindrop CS] Hook toggle detection: ON');
+          if (DEBUG) console.debug('[Tributary] Hook toggle detection: ON');
         } else {
           // Fallback to generic detector when hook returns false
           toggledOn = await isToggledOnAfterClick(host, button);
-          if (DEBUG) console.debug('[Raindrop CS] Hook false, generic toggle=', toggledOn);
+          if (DEBUG) console.debug('[Tributary] Hook false, generic toggle=', toggledOn);
         }
       } else {
         toggledOn = await isToggledOnAfterClick(host, button);
@@ -810,7 +810,7 @@ import { getFromStorage } from '../config/storage.js';
       toggledOn = await isToggledOnAfterClick(host, button);
     }
     if (!toggledOn) {
-      if (DEBUG) console.debug('[Raindrop CS] Click ignored (toggle not ON)');
+      if (DEBUG) console.debug('[Tributary] Click ignored (toggle not ON)');
       return; // ignore neutral->off or on->off transitions
     }
     // Additional protection for all hosts: require rising edge (prev OFF -> now ON)
@@ -818,7 +818,7 @@ import { getFromStorage } from '../config/storage.js';
       const prev = preClickOnState.get(button);
       preClickOnState.delete(button);
       if (prev === true) {
-        if (DEBUG) console.debug('[Raindrop CS] Ignoring toggle-off (was ON before click)');
+        if (DEBUG) console.debug('[Tributary] Ignoring toggle-off (was ON before click)');
         return;
       }
     } catch (_) { /* ignore */ }
@@ -828,7 +828,7 @@ import { getFromStorage } from '../config/storage.js';
       const now = Date.now();
       const prev = recentUrlsTS.get(url);
       if (prev && (now - prev) < 2000) {
-        if (DEBUG) console.debug('[Raindrop CS] Skipping duplicate URL save', url);
+        if (DEBUG) console.debug('[Tributary] Skipping duplicate URL save', url);
         return;
       }
       recentUrlsTS.set(url, now);
@@ -901,9 +901,9 @@ import { getFromStorage } from '../config/storage.js';
         excerpt = container.textContent.trim().substring(0, 500);
       }
     }
-    if (DEBUG) console.debug('[Raindrop CS] Saving', { url, titleLen: (title||'').length, excerptLen: (excerpt||'').length });
+    if (DEBUG) console.debug('[Tributary] Saving', { url, titleLen: (title||'').length, excerptLen: (excerpt||'').length });
     if (!chrome?.runtime?.id) {
-      if (DEBUG) console.warn('[Raindrop CS] runtime context missing; skipping save');
+      if (DEBUG) console.warn('[Tributary] runtime context missing; skipping save');
       recentUrlsTS.delete(url);
       showToast('Extension restarted. Reload the page to continue.', false, { reuseActive: true });
       return;
@@ -920,7 +920,7 @@ import { getFromStorage } from '../config/storage.js';
     } catch (err) {
       recentUrlsTS.delete(url);
       const message = (err && err.message) || '';
-      if (DEBUG) console.error('[Raindrop CS] Failed to send save message', err);
+      if (DEBUG) console.error('[Tributary] Failed to send save message', err);
       if (typeof message === 'string' && message.includes('Extension context invalidated')) {
         showToast('Extension restarted. Reload the page to continue.', false, { reuseActive: true });
         return;
@@ -947,7 +947,7 @@ import { getFromStorage } from '../config/storage.js';
     const stored = await getFromStorage([STORAGE_KEYS.ENABLED_DOMAINS, STORAGE_KEYS.DEBUG_LOGGING]);
     const enabled = stored[STORAGE_KEYS.ENABLED_DOMAINS] || {};
     DEBUG = !!stored[STORAGE_KEYS.DEBUG_LOGGING];
-    if (DEBUG) console.debug('[Raindrop CS] Init', { host, enabled: !(Object.prototype.hasOwnProperty.call(enabled, host) && enabled[host] === false) });
+    if (DEBUG) console.debug('[Tributary] Init', { host, enabled: !(Object.prototype.hasOwnProperty.call(enabled, host) && enabled[host] === false) });
     // Domain is enabled by default if not explicitly set to false
     if (Object.prototype.hasOwnProperty.call(enabled, host) && enabled[host] === false) {
       return;
@@ -984,9 +984,9 @@ import { getFromStorage } from '../config/storage.js';
             const wasOn = ap0 === 'true' || ac0 === 'true';
             preClickOnState.set(btn, wasOn);
           } catch (_) { }
-          if (DEBUG) console.debug('[Raindrop CS] Matched button', btn);
+          if (DEBUG) console.debug('[Tributary] Matched button', btn);
           processClick(btn, siteConfig).catch((err) => {
-            if (DEBUG) console.error('[Raindrop CS] processClick error', err);
+            if (DEBUG) console.error('[Tributary] processClick error', err);
           });
         } else if (host === 'reddit.com') {
           // Fallback: after a short delay, scan for any button that is now toggled ON
@@ -1022,7 +1022,7 @@ import { getFromStorage } from '../config/storage.js';
                 }
               }
               if (best) {
-                if (DEBUG) console.debug('[Raindrop CS] Fallback scan matched button', best);
+                if (DEBUG) console.debug('[Tributary] Fallback scan matched button', best);
                 // Mark as ON to avoid double triggers
                 lastOnState.set(best, true);
                 processClick(best, siteConfig);
@@ -1062,7 +1062,7 @@ import { getFromStorage } from '../config/storage.js';
             const ts = processedButtonsTS.get(target);
             if (ts && (Date.now() - ts) < 1500) return;
             // Use the same saving flow
-            if (DEBUG) console.debug('[Raindrop CS] Mutation matched button', target);
+            if (DEBUG) console.debug('[Tributary] Mutation matched button', target);
             processClick(target, siteConfig);
           } catch (_) { }
         };
@@ -1188,7 +1188,7 @@ import { getFromStorage } from '../config/storage.js';
                 } catch (_) { }
               }
               if (best) {
-                if (DEBUG) console.debug('[Raindrop CS] Poll matched button', best);
+                if (DEBUG) console.debug('[Tributary] Poll matched button', best);
                 lastOnState.set(best, true);
                 processClick(best, siteConfig);
               }
@@ -1203,7 +1203,7 @@ import { getFromStorage } from '../config/storage.js';
           showToast('Saved to Raindrop.io!', true, { reuseActive: true });
         } else {
           showToast(message.error || 'Error saving bookmark.', false, { reuseActive: true });
-          if (DEBUG) console.debug('[Raindrop CS] Save error', message);
+          if (DEBUG) console.debug('[Tributary] Save error', message);
         }
       }
     });
