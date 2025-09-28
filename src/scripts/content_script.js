@@ -902,14 +902,32 @@ import { getFromStorage } from '../config/storage.js';
       }
     }
     if (DEBUG) console.debug('[Raindrop CS] Saving', { url, titleLen: (title||'').length, excerptLen: (excerpt||'').length });
-    chrome.runtime.sendMessage({
-      action: 'save',
-      data: {
-        url,
-        title,
-        excerpt
+    if (!chrome?.runtime?.id) {
+      if (DEBUG) console.warn('[Raindrop CS] runtime context missing; skipping save');
+      recentUrlsTS.delete(url);
+      showToast('Extension restarted. Reload the page to continue.', false, { reuseActive: true });
+      return;
+    }
+    try {
+      await chrome.runtime.sendMessage({
+        action: 'save',
+        data: {
+          url,
+          title,
+          excerpt
+        }
+      });
+    } catch (err) {
+      recentUrlsTS.delete(url);
+      const message = (err && err.message) || '';
+      if (DEBUG) console.error('[Raindrop CS] Failed to send save message', err);
+      if (typeof message === 'string' && message.includes('Extension context invalidated')) {
+        showToast('Extension restarted. Reload the page to continue.', false, { reuseActive: true });
+        return;
       }
-    });
+      showToast('Unable to save. Please refresh and try again.', false, { reuseActive: true });
+      return;
+    }
     // Mark button as processed to avoid immediate re-processing
     try { processedButtonsTS.set(button, Date.now()); } catch (_) {}
   }
@@ -967,7 +985,9 @@ import { getFromStorage } from '../config/storage.js';
             preClickOnState.set(btn, wasOn);
           } catch (_) { }
           if (DEBUG) console.debug('[Raindrop CS] Matched button', btn);
-          processClick(btn, siteConfig);
+          processClick(btn, siteConfig).catch((err) => {
+            if (DEBUG) console.error('[Raindrop CS] processClick error', err);
+          });
         } else if (host === 'reddit.com') {
           // Fallback: after a short delay, scan for any button that is now toggled ON
           setTimeout(() => {
