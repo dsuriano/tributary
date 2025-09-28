@@ -1,5 +1,5 @@
 import { build, context as createContext } from 'esbuild';
-import { mkdir, rm, writeFile, copyFile, readFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile, copyFile, readFile, readdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,6 +8,22 @@ const __dirname = dirname(__filename);
 
 const rootDir = join(__dirname, '..');
 const outdir = join(rootDir, 'dist');
+
+async function copyDirectory(src, dest) {
+  const entries = await readdir(src, { withFileTypes: true });
+  await mkdir(dest, { recursive: true });
+
+  await Promise.all(entries.map(async (entry) => {
+    const srcPath = join(src, entry.name);
+    const destPath = join(dest, entry.name);
+
+    if (entry.isDirectory()) {
+      await copyDirectory(srcPath, destPath);
+    } else {
+      await copyFile(srcPath, destPath);
+    }
+  }));
+}
 
 async function copyPublicAssets() {
   // Icons
@@ -24,6 +40,10 @@ async function copyPublicAssets() {
   await mkdir(optionsDest, { recursive: true });
   await copyFile(join(optionsSrc, 'options.html'), join(optionsDest, 'options.html'));
   await copyFile(join(optionsSrc, 'options.css'), join(optionsDest, 'options.css'));
+
+  const assetsSrc = join(rootDir, 'assets');
+  const assetsDest = join(outdir, 'assets');
+  await copyDirectory(assetsSrc, assetsDest);
 
   const manifestJson = JSON.parse(await readFile(join(rootDir, 'manifest.json'), 'utf-8'));
   await writeFile(join(outdir, 'manifest.json'), JSON.stringify(manifestJson, null, 2));

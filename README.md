@@ -97,25 +97,11 @@ tributary/
 ├─ LICENSE                      # MIT license
 ├─ CONTRIBUTING.md              # Contribution guide
 └─ CODE_OF_CONDUCT.md           # Community guidelines
+```
 
 > **Note**: Source files are located in the `src/` directory. Run `npm run build` to produce the bundled extension inside `dist/` before loading it into Chrome.
 
 ### Permissions
-
- The extension requests the minimal set of Chrome permissions needed to function, as defined in `manifest.json`:
-
-- `permissions`
-  - `storage`
-- `host_permissions`
-  - `*://*.twitter.com/*`
-  - `*://*.x.com/*`
-  - `*://*.youtube.com/*`
-  - `*://*.reddit.com/*`
-  - `https://api.raindrop.io/*`
-- `options_page`
-  - `options/options.html`
-- `web_accessible_resources`
-  - `scripts/sites/index.js`, `scripts/sites/*.js` (for dynamic provider loading)
 
  To allow the extension to create bookmarks, you need a **test token** from Raindrop.io:
  1. Log in to your Raindrop.io account.
