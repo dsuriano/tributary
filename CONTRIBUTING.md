@@ -33,8 +33,8 @@ const example = {
   buttonSelector: 'button[aria-label="Like"]',
   containerSelector: ['article', 'div.post'],
   hooks: {
-    toggledOnAfterClick: async (button) => {
-      await new Promise(r => setTimeout(r, 80));
+    toggledOnAfterClick: async (button, ctx) => {
+      await ctx.utils.wait(80);
       const el = button.closest('button') || button;
       return el && el.getAttribute('aria-pressed') === 'true';
     },
@@ -43,10 +43,10 @@ const example = {
       const a = container.querySelector('a[href^="http"]');
       return a ? a.href : '';
     },
-    getTitle: () => document.title || '',
-    getExcerpt: (button) => {
+    getTitle: (_button, ctx) => ctx.utils.normaliseText(document.title, 200),
+    getExcerpt: (button, ctx) => {
       const container = button.closest('article') || document;
-      return (container.textContent || '').trim().slice(0, 500);
+      return ctx.utils.normaliseText((container.textContent || ''), 500);
     }
   }
 };

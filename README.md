@@ -144,12 +144,25 @@ When a supported button is clicked, the following occurs:
 5.  A message containing the URL, page title, and a short excerpt is sent to the background script.
 6.  A toast notification is displayed while awaiting the result.
 
-Each site provider can also expose small hook functions to customize behavior. See `src/scripts/sites/twitter.js`, `src/scripts/sites/youtube.js`, or `src/scripts/sites/reddit.js` for examples:
+Each site provider can also expose hook functions to customize behavior. See `src/scripts/sites/twitter.js`, `src/scripts/sites/youtube.js`, or `src/scripts/sites/reddit.js` for examples:
 
--   `hooks.toggledOnAfterClick(button)`: Returns `true` only when a click toggles the positive state (e.g., the like button is now "on").
--   `hooks.getPermalink(button)`: Returns a canonical permalink.
--   `hooks.getTitle(button)`: Overrides the page title.
--   `hooks.getExcerpt(button)`: Overrides the summary excerpt.
+- **`hooks.toggledOnAfterClick(button, ctx)`** Returns `true` only when a click toggles the positive state (e.g., the like button is now "on"). Return `false` to explicitly cancel a save, or `undefined` to fall back to the generic detector.
+- **`hooks.getPermalink(button, ctx)`** Returns a canonical permalink.
+- **`hooks.getTitle(button, ctx)`** Overrides the page title.
+- **`hooks.getExcerpt(button, ctx)`** Overrides the summary excerpt.
+- **`hooks.handleUnmatchedClick(event, ctx)`** Optional. Invoked when the primary selectors miss the target (useful for post-click scans or pointer heuristics).
+- **`hooks.onInit(ctx)`** Optional. Run once after listeners are attached; ideal for wiring MutationObservers or shadow-root listeners.
+
+###### Hook context (`ctx`)
+
+Hook callbacks receive a shared context with helpers and state:
+
+- **`ctx.attachInputListeners(root)`** Attach the core click listeners to an additional root (e.g., inside a shadow DOM).
+- **`ctx.processButton(button)`** Manually trigger the save pipeline for a button element.
+- **`ctx.state`** Shared WeakMaps for dedupe/state (`lastEvent`, `processedButtonsTS`, `lastOnState`, `preClickOnState`).
+- **`ctx.timing`** Reference to `TIMING` constants (e.g., `ctx.timing.REDDIT_POLL_INTERVAL_MS`).
+- **`ctx.utils`** Async helpers: `wait(ms)`, `waitForCondition(fn, opts)`, and `normaliseText(text, maxLen)`.
+- **`ctx.debugEnabled()` / `ctx.debugLog(...args)`** Debug logging helpers that respect the Options page toggle.
 
 #### Background Script
 
@@ -167,8 +180,8 @@ const example = {
   buttonSelector: 'button[aria-label="Like"]',
   containerSelector: ['article', 'div.post'],
   hooks: {
-    toggledOnAfterClick: async (button) => {
-      await new Promise(r => setTimeout(r, 80));
+    toggledOnAfterClick: async (button, ctx) => {
+      await ctx.utils.wait(80);
       const el = button.closest('button') || button;
       return el && el.getAttribute('aria-pressed') === 'true';
     },
@@ -177,10 +190,10 @@ const example = {
       const a = container.querySelector('a[href^="http"]');
       return a ? a.href : '';
     },
-    getTitle: () => document.title || '',
-    getExcerpt: (button) => {
+    getTitle: (_button, ctx) => ctx.utils.normaliseText(document.title, 200),
+    getExcerpt: (button, ctx) => {
       const container = button.closest('article') || document;
-      return (container.textContent || '').trim().slice(0, 500);
+      return ctx.utils.normaliseText((container.textContent || ''), 500);
     }
   }
 };
