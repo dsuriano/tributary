@@ -15,7 +15,11 @@ const reddit: SiteConfig = {
   ],
   containerSelector: ['div[data-testid="post-container"]', 'article'],
   hooks: {
-    toggledOnAfterClick: async (button): Promise<boolean> => {
+    toggledOnAfterClick: async (button, ctx): Promise<boolean> => {
+      // Reddit buttons toggle immediately, so we need to check the pre-click state
+      // to determine if this is an upvote (OFF->ON) or un-upvote (ON->OFF)
+      const preState = ctx?.state?.preClickOnState?.get(button);
+      
       await new Promise(r => setTimeout(r, 80));
       const innerBtn = button.closest('button[aria-label="upvote"]')
         || button.closest('button[aria-label*="upvote" i]')
@@ -25,7 +29,20 @@ const reddit: SiteConfig = {
         || button;
       const ap = innerBtn?.getAttribute('aria-pressed');
       const ac = innerBtn?.getAttribute('aria-checked');
-      return ap === 'true' || ac === 'true';
+      const isNowOn = ap === 'true' || ac === 'true';
+      
+      // Only save if we went from OFF to ON (not ON to OFF)
+      if (preState === true && !isNowOn) {
+        // Was ON, now OFF - this is an un-upvote, don't save
+        return false;
+      }
+      if (preState === false && isNowOn) {
+        // Was OFF, now ON - this is an upvote, save it
+        return true;
+      }
+      
+      // Fallback to current state if we don't have pre-state
+      return isNowOn;
     },
     
     getPermalink: (button): string => {

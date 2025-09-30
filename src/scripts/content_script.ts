@@ -82,7 +82,7 @@ interface StorageData {
     siteConfig: null,
     hooks: {},
     buttonSelectors: [],
-    eventsToListen: ['click', 'pointerup', 'mousedown'],
+    eventsToListen: ['mousedown', 'pointerdown', 'click', 'pointerup'],
     hookContext: null
   };
 
@@ -717,10 +717,6 @@ interface StorageData {
     
     const handleInputEvent = (event: Event): void => {
       const now = Date.now();
-      if (now - lastClickTime < DEBOUNCE_DELAY) {
-        return;
-      }
-      lastClickTime = now;
       
       // Remember pointer position/time
       try {
@@ -738,16 +734,26 @@ interface StorageData {
       }
       
       if (btn) {
+        // For mousedown/pointerdown, just capture the pre-click state
+        if (event.type === 'mousedown' || event.type === 'pointerdown') {
+          try {
+            const ap0 = btn.getAttribute('aria-pressed');
+            const ac0 = btn.getAttribute('aria-checked');
+            const wasOn = ap0 === 'true' || ac0 === 'true';
+            preClickOnState.set(btn, wasOn);
+            if (DEBUG) console.debug('[Tributary] Captured pre-click state:', wasOn);
+          } catch (_) { }
+          return; // Don't process yet, wait for click event
+        }
+        
+        // For click/pointerup, process the button
+        if (now - lastClickTime < DEBOUNCE_DELAY) {
+          return;
+        }
+        lastClickTime = now;
+        
         const ts = processedButtonsTS.get(btn);
         if (ts && (Date.now() - ts) < BUTTON_DEDUPE_WINDOW) return;
-        
-        // Capture pre-click ON state
-        try {
-          const ap0 = btn.getAttribute('aria-pressed');
-          const ac0 = btn.getAttribute('aria-checked');
-          const wasOn = ap0 === 'true' || ac0 === 'true';
-          preClickOnState.set(btn, wasOn);
-        } catch (_) { }
         
         if (DEBUG) console.debug('[Tributary] Matched button', btn);
         processClick(btn).catch((err) => {
