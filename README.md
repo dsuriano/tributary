@@ -92,9 +92,16 @@ tributary/
 │        ├─ youtube.js         # YouTube provider
 │        ├─ reddit.js          # Reddit provider
 │        └─ generic.js         # Fallback provider
+├─ tests/                       # Test suite (Jest + Playwright)
+│  ├─ sites/                   # Site provider tests
+│  ├─ e2e/                     # End-to-end tests
+│  └─ helpers/                 # Test utilities
 ├─ manifest.json                # Chrome MV3 manifest (type: module)
 ├─ package.json                 # Tooling & npm scripts
+├─ jest.config.js               # Jest configuration
+├─ playwright.config.js         # Playwright configuration
 ├─ LICENSE                      # MIT license
+├─ TESTING.md                   # Testing guide
 ├─ CONTRIBUTING.md              # Contribution guide
 └─ CODE_OF_CONDUCT.md           # Community guidelines
 ```
@@ -251,15 +258,48 @@ const providers = [
 -   **Rate Limiting.** The Raindrop.io API limits requests. The extension applies a simple backoff if a 429 response is received, but rapid clicks may still result in temporary failures.
 -   **Link Extraction.** The algorithm picks the first external link it finds in a post. There is currently no way to choose which link is saved if a post contains multiple.
 
+### Testing
+
+This project includes comprehensive automated tests:
+
+```bash
+# Run unit and integration tests
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run tests in watch mode (for development)
+npm run test:watch
+
+# Run end-to-end tests (requires build first)
+npm run build
+npm run test:e2e
+```
+
+See `TESTING.md` for detailed testing documentation, including:
+- Writing new tests
+- Test structure and patterns
+- Coverage goals
+- Debugging tests
+- E2E testing with Playwright
+
 ### Contributing
 
 Pull requests and suggestions are welcome. See `CONTRIBUTING.md` for development setup and coding style. Please follow the `CODE_OF_CONDUCT.md`.
+
+**Before submitting a PR:**
+1. Run `npm test` to ensure all tests pass
+2. Run `npm run test:coverage` to verify coverage thresholds
+3. Add tests for new features
+4. Update documentation as needed
 
 ### Debugging
 
 -   Enable "Debug logging" in the Options page to get verbose logs from the service worker.
 -   To view service worker logs, go to `chrome://extensions`, find the extension, and click the "Service worker" link.
 -   For content script logs, open the browser's DevTools on the tab where you are testing.
+-   Run tests with `npm test -- --verbose` for detailed output.
 
 ### License
 
