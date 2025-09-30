@@ -1,5 +1,5 @@
-import { describe, test, expect, beforeEach } from '@jest/globals';
-import youtube from '../../src/scripts/sites/youtube.js';
+import { describe, test, expect, beforeEach } from 'vitest';
+import youtube from '../../src/scripts/sites/youtube.ts';
 import { createYouTubeVideo, setToggleState } from '../helpers/dom-helpers.js';
 
 describe('YouTube Provider', () => {

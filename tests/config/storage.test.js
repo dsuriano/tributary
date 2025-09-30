@@ -1,9 +1,9 @@
-import { describe, test, expect, beforeEach, jest } from '@jest/globals';
-import { getFromStorage, setToStorage, removeFromStorage } from '../../src/config/storage.js';
+import { describe, test, expect, beforeEach, vi } from 'vitest';
+import { getFromStorage, setToStorage, removeFromStorage } from '../../src/config/storage.ts';
 
 describe('Storage Utilities', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     chrome.runtime.lastError = null;
   });
 

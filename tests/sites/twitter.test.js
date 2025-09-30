@@ -1,5 +1,5 @@
-import { describe, test, expect, beforeEach } from '@jest/globals';
-import twitter from '../../src/scripts/sites/twitter.js';
+import { describe, test, expect, beforeEach } from 'vitest';
+import twitter from '../../src/scripts/sites/twitter.ts';
 import { createTwitterPost, setToggleState } from '../helpers/dom-helpers.js';
 
 describe('Twitter Provider', () => {

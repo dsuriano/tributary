@@ -1,4 +1,6 @@
-function normaliseText(text, maxLen = 0) {
+import type { SiteConfig, HookContext } from './types.js';
+
+function normaliseText(text: string | null | undefined, maxLen = 0): string {
   if (!text) return '';
   let t = String(text).replace(/\s+/g, ' ').trim();
   if (maxLen > 0 && t.length > maxLen) {
@@ -7,7 +9,7 @@ function normaliseText(text, maxLen = 0) {
   return t;
 }
 
-function isYouTubeShortsPage() {
+function isYouTubeShortsPage(): boolean {
   try {
     const p = window.location.pathname || '';
     return /^\/shorts\//.test(p);
@@ -16,22 +18,26 @@ function isYouTubeShortsPage() {
   }
 }
 
-function waitMs(ctx, ms = 60) {
+function waitMs(ctx: Partial<HookContext>, ms = 60): Promise<void> {
   try {
-    if (ctx && ctx.utils && typeof ctx.utils.wait === 'function') {
+    if (ctx?.utils?.wait) {
       return ctx.utils.wait(ms);
     }
   } catch (_) {}
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function waitForCondition(ctx, predicate, options = {}) {
+function waitForCondition(
+  ctx: Partial<HookContext>,
+  predicate: () => boolean,
+  options: { timeout?: number; interval?: number } = {}
+): Promise<boolean> {
   try {
-    if (ctx && ctx.utils && typeof ctx.utils.waitForCondition === 'function') {
+    if (ctx?.utils?.waitForCondition) {
       return ctx.utils.waitForCondition(predicate, options);
     }
   } catch (_) {}
-  const { timeout = 1500, interval = 50 } = options || {};
+  const { timeout = 1500, interval = 50 } = options;
   return new Promise((resolve) => {
     const start = Date.now();
     const timer = setInterval(() => {
@@ -50,8 +56,15 @@ function waitForCondition(ctx, predicate, options = {}) {
   });
 }
 
-function collectVideoObjects() {
-  const items = [];
+interface VideoObject {
+  '@type'?: string | string[];
+  name?: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
+function collectVideoObjects(): VideoObject[] {
+  const items: VideoObject[] = [];
   try {
     const scripts = Array.from(document.querySelectorAll('script[type="application/ld+json"]'));
     for (const s of scripts) {
@@ -70,7 +83,7 @@ function collectVideoObjects() {
   return items;
 }
 
-function getYouTubeShortsTitle() {
+function getYouTubeShortsTitle(): string {
   for (const it of collectVideoObjects()) {
     if (typeof it.name === 'string' && it.name.trim()) {
       const t = normaliseText(it.name, 200);
@@ -87,15 +100,15 @@ function getYouTubeShortsTitle() {
   ];
   for (const sel of selectors) {
     const el = document.querySelector(sel);
-    if (el && (el.innerText || el.textContent)) {
-      const t = normaliseText(el.innerText || el.textContent, 200);
+    if (el && (el.textContent)) {
+      const t = normaliseText(el.textContent, 200);
       if (t) return t;
     }
   }
   return normaliseText(document.title || '', 200);
 }
 
-function getYouTubeShortsDescription() {
+function getYouTubeShortsDescription(): string {
   for (const it of collectVideoObjects()) {
     if (typeof it.description === 'string' && it.description.trim()) {
       const d = normaliseText(it.description, 4000);
@@ -110,19 +123,19 @@ function getYouTubeShortsDescription() {
   ];
   for (const sel of selectors) {
     const el = document.querySelector(sel);
-    if (el && el.innerText) {
-      const t = normaliseText(el.innerText, 1000);
+    if (el && el.textContent) {
+      const t = normaliseText(el.textContent, 1000);
       if (t) return t;
     }
   }
   try {
-    const meta = document.querySelector('meta[name="description"]');
-    if (meta && meta.content) return normaliseText(meta.content, 1000);
+    const meta = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
+    if (meta?.content) return normaliseText(meta.content, 1000);
   } catch (_) {}
   return '';
 }
 
-function getYouTubeTitleFromPage() {
+function getYouTubeTitleFromPage(): string {
   for (const it of collectVideoObjects()) {
     if (typeof it.name === 'string' && it.name.trim()) {
       const t = normaliseText(it.name, 200);
@@ -135,7 +148,7 @@ function getYouTubeTitleFromPage() {
       || document.querySelector('h1.title')
       || document.querySelector('meta[name="title"]');
     if (titleEl) {
-      const raw = titleEl.getAttribute && titleEl.getAttribute('content') ? titleEl.getAttribute('content') : (titleEl.textContent || '');
+      const raw = titleEl.getAttribute?.('content') || titleEl.textContent || '';
       const t = normaliseText(raw, 200);
       if (t) return t;
     }
@@ -143,12 +156,12 @@ function getYouTubeTitleFromPage() {
   return normaliseText(document.title || '', 200);
 }
 
-function getYouTubeExpanderRoot() {
+function getYouTubeExpanderRoot(): Element | null {
   return document.querySelector('ytd-watch-metadata ytd-text-inline-expander')
     || document.querySelector('#description-inline-expander');
 }
 
-function clickYouTubeDescriptionExpand() {
+function clickYouTubeDescriptionExpand(): boolean {
   try {
     const root = getYouTubeExpanderRoot();
     const candidates = [
@@ -157,7 +170,7 @@ function clickYouTubeDescriptionExpand() {
       'tp-yt-paper-button[aria-label*="more" i]',
       'button[aria-label*="more" i]'
     ];
-    let btn = null;
+    let btn: Element | null = null;
     for (const sel of candidates) {
       const el = root ? root.querySelector(sel) : document.querySelector(sel);
       if (el && !el.hasAttribute('hidden')) { btn = el; break; }
@@ -177,13 +190,13 @@ function clickYouTubeDescriptionExpand() {
     for (const e of events) {
       try { btn.dispatchEvent(e); } catch (_) {}
     }
-    try { btn.click(); } catch (_) {}
+    try { (btn as HTMLElement).click?.(); } catch (_) {}
     return true;
   } catch (_) {}
   return false;
 }
 
-function isYouTubeDescriptionExpanded() {
+function isYouTubeDescriptionExpanded(): boolean {
   try {
     const root = getYouTubeExpanderRoot();
     if (!root) return false;
@@ -199,21 +212,21 @@ function isYouTubeDescriptionExpanded() {
   return false;
 }
 
-async function ensureYouTubeDescriptionExpanded(ctx) {
+async function ensureYouTubeDescriptionExpanded(ctx: Partial<HookContext>): Promise<boolean> {
   if (isYouTubeDescriptionExpanded()) return true;
   await waitForCondition(ctx, () => !!getYouTubeExpanderRoot(), { timeout: 3000, interval: 80 });
   clickYouTubeDescriptionExpand();
   let baselineLen = 0;
   try {
     const root = getYouTubeExpanderRoot();
-    baselineLen = root ? (root.innerText || '').length : 0;
+    baselineLen = root ? (root.textContent || '').length : 0;
   } catch (_) {}
   let expanded = await waitForCondition(ctx, () => {
     if (isYouTubeDescriptionExpanded()) return true;
     try {
       const root = getYouTubeExpanderRoot();
       if (!root) return false;
-      const len = (root.innerText || '').length;
+      const len = (root.textContent || '').length;
       return len > baselineLen + 40;
     } catch (_) { return false; }
   }, { timeout: 5000, interval: 80 });
@@ -225,7 +238,7 @@ async function ensureYouTubeDescriptionExpanded(ctx) {
   return expanded;
 }
 
-function getYouTubeDescriptionFromPage() {
+function getYouTubeDescriptionFromPage(): string {
   for (const it of collectVideoObjects()) {
     if (typeof it.description === 'string' && it.description.trim()) {
       const desc = normaliseText(it.description, 5000);
@@ -243,23 +256,23 @@ function getYouTubeDescriptionFromPage() {
   for (const sel of selectors) {
     try {
       const el = document.querySelector(sel);
-      if (el && el.innerText) {
-        const text = el.innerText.replace(/^(Show more|More)\s*/i, '');
+      if (el && el.textContent) {
+        const text = el.textContent.replace(/^(Show more|More)\s*/i, '');
         const normalised = normaliseText(text, 2000);
         if (normalised) return normalised;
       }
     } catch (_) { /* ignore */ }
   }
   try {
-    const meta = document.querySelector('meta[name="description"]');
-    if (meta && meta.content) {
+    const meta = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
+    if (meta?.content) {
       return normaliseText(meta.content, 1000);
     }
   } catch (_) {}
   return '';
 }
 
-const youtube = {
+const youtube: SiteConfig = {
   buttonSelector: [
     'button#like-button',
     'ytd-toggle-button-renderer button',
@@ -267,10 +280,10 @@ const youtube = {
   ],
   containerSelector: ['ytd-watch-metadata', 'body'],
   hooks: {
-    toggledOnAfterClick: async (button, ctx = {}) => {
-      await waitMs(ctx, 80);
+    toggledOnAfterClick: async (button, ctx): Promise<boolean> => {
+      await waitMs(ctx || {}, 80);
       const toggleRoot = button.closest('ytd-toggle-button-renderer') || button.closest('#like-button') || button;
-      const innerBtn = (toggleRoot && toggleRoot.querySelector('button')) || toggleRoot;
+      const innerBtn = (toggleRoot?.querySelector('button')) || toggleRoot;
       if (!innerBtn) return false;
       const ap = innerBtn.getAttribute('aria-pressed');
       const ac = innerBtn.getAttribute('aria-checked');
@@ -278,12 +291,12 @@ const youtube = {
       const cls = innerBtn.className || '';
       return ap === 'true' || ac === 'true' || as === 'true' || (typeof cls === 'string' && cls.includes('style-default-active'));
     },
-    getPermalink: () => {
+    getPermalink: (): string => {
       try {
         const loc = new URL(window.location.href);
         const path = loc.pathname || '';
         const shortsMatch = path.match(/^\/shorts\/([a-zA-Z0-9_-]{8,})/);
-        if (shortsMatch && shortsMatch[1]) {
+        if (shortsMatch?.[1]) {
           return `${loc.origin}/shorts/${shortsMatch[1]}`;
         }
         const v = loc.searchParams.get('v');
@@ -293,14 +306,14 @@ const youtube = {
       } catch (_) {}
       return '';
     },
-    getTitle: async (_button, _ctx = {}) => {
+    getTitle: async (): Promise<string> => {
       if (isYouTubeShortsPage()) {
         const shorts = getYouTubeShortsTitle();
         if (shorts) return shorts;
       }
       return getYouTubeTitleFromPage();
     },
-    getExcerpt: async (_button, ctx = {}) => {
+    getExcerpt: async (_button, ctx): Promise<string> => {
       if (isYouTubeShortsPage()) {
         const shortsDesc = getYouTubeShortsDescription();
         if (shortsDesc) return shortsDesc;
@@ -308,11 +321,9 @@ const youtube = {
       let desc = getYouTubeDescriptionFromPage();
       if (!desc || desc.length < 400) {
         try {
-          await ensureYouTubeDescriptionExpanded(ctx);
-          const retryDelay = (ctx && ctx.timing && typeof ctx.timing.YOUTUBE_DESCRIPTION_RETRY_MS === 'number')
-            ? ctx.timing.YOUTUBE_DESCRIPTION_RETRY_MS
-            : 120;
-          await waitMs(ctx, retryDelay);
+          await ensureYouTubeDescriptionExpanded(ctx || {});
+          const retryDelay = ctx?.timing?.YOUTUBE_DESCRIPTION_RETRY_MS ?? 120;
+          await waitMs(ctx || {}, retryDelay);
           desc = getYouTubeDescriptionFromPage();
         } catch (_) { /* ignore */ }
       }

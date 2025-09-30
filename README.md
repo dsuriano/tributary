@@ -27,6 +27,14 @@ Save interesting content from your social feeds straight into your Raindrop.io c
 -   Node.js 18+ and npm 9+ to run the build tooling.
 -   A Raindrop.io account with access to generate a test token.
 
+### Technology Stack
+
+-   **TypeScript 5.3+** - 100% type-safe codebase with strict mode enabled
+-   **esbuild** - Fast bundler with TypeScript support
+-   **Jest** - Unit and integration testing
+-   **Playwright** - End-to-end browser testing
+-   **Chrome Extension Manifest V3** - Modern extension architecture
+
 ## Setup and Installation
 
 1.  **Clone the Repository**
@@ -79,25 +87,27 @@ tributary/
 ├─ options/                     # Static HTML/CSS copied into dist/
 ├─ src/
 │  ├─ config/
-│  │  ├─ constants.js           # Shared API endpoints, timings, UI copy
-│  │  └─ storage.js             # Promise-based helpers around chrome.storage
+│  │  ├─ constants.ts           # Shared API endpoints, timings, UI copy (TypeScript)
+│  │  └─ storage.ts             # Promise-based helpers around chrome.storage (TypeScript)
 │  ├─ options/
-│  │  └─ options.js            # Options page script (bundled to dist/options)
+│  │  └─ options.ts             # Options page script (TypeScript, bundled to dist/options)
 │  └─ scripts/
-│     ├─ background.js         # Service worker: Raindrop API integration
-│     ├─ content_script.js     # In-page interaction logic
-│     └─ sites/                # Modular site providers + registry
-│        ├─ index.js           # Hostname -> provider registry (lazy-loaded)
-│        ├─ twitter.js         # Twitter/X provider
-│        ├─ youtube.js         # YouTube provider
-│        ├─ reddit.js          # Reddit provider
-│        └─ generic.js         # Fallback provider
+│     ├─ background.ts          # Service worker: Raindrop API integration (TypeScript)
+│     ├─ content_script.ts      # In-page interaction logic (TypeScript)
+│     └─ sites/                 # Modular site providers + registry (TypeScript)
+│        ├─ types.ts            # Type definitions for site providers
+│        ├─ index.ts            # Hostname -> provider registry (lazy-loaded)
+│        ├─ twitter.ts          # Twitter/X provider
+│        ├─ youtube.ts          # YouTube provider
+│        ├─ reddit.ts           # Reddit provider
+│        └─ generic.ts          # Fallback provider
 ├─ tests/                       # Test suite (Jest + Playwright)
-│  ├─ sites/                   # Site provider tests
-│  ├─ e2e/                     # End-to-end tests
-│  └─ helpers/                 # Test utilities
+│  ├─ sites/                    # Site provider tests
+│  ├─ e2e/                      # End-to-end tests
+│  └─ helpers/                  # Test utilities
 ├─ manifest.json                # Chrome MV3 manifest (type: module)
 ├─ package.json                 # Tooling & npm scripts
+├─ tsconfig.json                # TypeScript configuration
 ├─ jest.config.js               # Jest configuration
 ├─ playwright.config.js         # Playwright configuration
 ├─ LICENSE                      # MIT license
@@ -140,7 +150,7 @@ A toast message will appear briefly confirming that the bookmark was saved. If t
 
 #### Content Script
 
-The content script is injected into each supported site when the page finishes loading. It lazily imports a site-specific provider via the registry in `scripts/sites/index.js` based on the current hostname. Rather than relying on brittle CSS classes, providers prefer stable attributes such as `data-testid` and `aria-label` to find the correct elements.
+The content script is injected into each supported site when the page finishes loading. It lazily imports a site-specific provider via the registry in `scripts/sites/index.ts` based on the current hostname. Rather than relying on brittle CSS classes, providers prefer stable attributes such as `data-testid` and `aria-label` to find the correct elements.
 
 When a supported button is clicked, the following occurs:
 
@@ -151,7 +161,7 @@ When a supported button is clicked, the following occurs:
 5.  A message containing the URL, page title, and a short excerpt is sent to the background script.
 6.  A toast notification is displayed while awaiting the result.
 
-Each site provider can also expose hook functions to customize behavior. See `src/scripts/sites/twitter.js`, `src/scripts/sites/youtube.js`, or `src/scripts/sites/reddit.js` for examples:
+Each site provider can also expose hook functions to customize behavior. See `src/scripts/sites/twitter.ts`, `src/scripts/sites/youtube.ts`, or `src/scripts/sites/reddit.ts` for examples:
 
 - **`hooks.toggledOnAfterClick(button, ctx)`** Returns `true` only when a click toggles the positive state (e.g., the like button is now "on"). Return `false` to explicitly cancel a save, or `undefined` to fall back to the generic detector.
 - **`hooks.getPermalink(button, ctx)`** Returns a canonical permalink.
@@ -173,17 +183,19 @@ Hook callbacks receive a shared context with helpers and state:
 
 #### Background Script
 
-The service worker (`src/scripts/background.js`) listens for messages and uses the Raindrop.io API to create bookmarks. When a `save` message arrives, it reads the user's token and default settings and calls `POST https://api.raindrop.io/rest/v1/raindrop`. A 429 response triggers a configurable backoff window, while a 401 response clears the invalid token from storage and displays an error. The worker also handles API requests for the options page, such as `getCollections` and `validateToken`.
+The service worker (`src/scripts/background.ts`) listens for messages and uses the Raindrop.io API to create bookmarks. When a `save` message arrives, it reads the user's token and default settings and calls `POST https://api.raindrop.io/rest/v1/raindrop`. A 429 response triggers a configurable backoff window, while a 401 response clears the invalid token from storage and displays an error. The worker also handles API requests for the options page, such as `getCollections` and `validateToken`.
 
 #### Adding a New Website
 
-To add another website, create a provider file under `src/scripts/sites/` and register it in `src/scripts/sites/index.js`.
+To add another website, create a provider file under `src/scripts/sites/` and register it in `src/scripts/sites/index.ts`.
 
-**Example provider (`src/scripts/sites/example.js`):**
+**Example provider (`src/scripts/sites/example.ts`):**
 
-```js
+```typescript
+import type { SiteConfig } from './types.js';
+
 // Example provider for example.com
-const example = {
+const example: SiteConfig = {
   buttonSelector: 'button[aria-label="Like"]',
   containerSelector: ['article', 'div.post'],
   hooks: {

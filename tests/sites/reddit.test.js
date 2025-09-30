@@ -1,5 +1,5 @@
-import { describe, test, expect, beforeEach } from '@jest/globals';
-import reddit from '../../src/scripts/sites/reddit.js';
+import { describe, test, expect, beforeEach } from 'vitest';
+import reddit from '../../src/scripts/sites/reddit.ts';
 import { createRedditPost, setToggleState } from '../helpers/dom-helpers.js';
 
 describe('Reddit Provider', () => {

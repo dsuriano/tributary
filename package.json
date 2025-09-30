@@ -4,14 +4,14 @@
   "description": "Tributary: The effortless archive for Raindrop.io.",
   "type": "module",
   "scripts": {
-    "clean": "rimraf dist",
     "build": "npm run clean && node build/build.mjs",
     "dev": "node build/build.mjs --watch",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
-    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "clean": "rimraf dist",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "test:e2e": "playwright test"
   },
   "keywords": [
     "chrome-extension",
@@ -21,13 +21,16 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@jest/globals": "^29.7.0",
     "@playwright/test": "^1.40.1",
     "@testing-library/dom": "^9.3.4",
-    "@testing-library/jest-dom": "^6.1.5",
+    "@testing-library/jest-dom": "^6.8.0",
+    "@types/chrome": "^0.0.268",
+    "@types/node": "^20.11.19",
+    "@vitest/ui": "^3.2.4",
     "esbuild": "^0.25.10",
-    "jest": "^29.7.0",
-    "jest-environment-jsdom": "^29.7.0",
-    "rimraf": "^5.0.7"
+    "jsdom": "^27.0.0",
+    "rimraf": "^5.0.7",
+    "typescript": "^5.3.3",
+    "vitest": "^3.2.4"
   }
 }

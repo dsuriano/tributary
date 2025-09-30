@@ -1,15 +1,20 @@
-// Twitter / X provider
-const twitter = {
+import type { SiteConfig } from './types.js';
+
+/**
+ * Twitter / X provider
+ */
+const twitter: SiteConfig = {
   buttonSelector: ['[data-testid="like"]', '[data-testid="unlike"]'],
   containerSelector: 'article',
   hooks: {
-    toggledOnAfterClick: async (button) => {
+    toggledOnAfterClick: async (button): Promise<boolean> => {
       await new Promise(r => setTimeout(r, 120));
       const root = button.closest('[data-testid="like"]')
         || button.closest('[data-testid="unlike"]')
         || button.closest('button, [role="button"]')
         || button;
-      const hasOn = (el) => {
+      
+      const hasOn = (el: Element | null): boolean => {
         if (!el) return false;
         const ap = el.getAttribute('aria-pressed');
         const ac = el.getAttribute('aria-checked');
@@ -18,16 +23,20 @@ const twitter = {
         const dt = el.getAttribute('data-testid');
         return ap === 'true' || ac === 'true' || as === 'true' || dt === 'unlike' || (typeof cls === 'string' && cls.includes('style-default-active'));
       };
+      
       if (hasOn(root)) return true;
-      const inner = root && root.querySelector('[aria-pressed="true"], [aria-checked="true"], [aria-selected="true"], .style-default-active, [data-testid="unlike"]');
+      const inner = root?.querySelector('[aria-pressed="true"], [aria-checked="true"], [aria-selected="true"], .style-default-active, [data-testid="unlike"]');
       return !!inner;
     },
-    getPermalink: (button) => {
+    
+    getPermalink: (button): string => {
       const article = button.closest('article') || document.querySelector('article');
       if (!article) return '';
+      
       const statusAnchors = article.querySelectorAll('a[href*="/status/"]');
-      const anchor = statusAnchors[statusAnchors.length - 1];
+      const anchor = statusAnchors[statusAnchors.length - 1] as HTMLAnchorElement | undefined;
       if (!anchor) return '';
+      
       const href = anchor.getAttribute('href') || '';
       try {
         const url = new URL(href, window.location.origin);
@@ -41,23 +50,33 @@ const twitter = {
           url.search = '';
         }
         return url.href;
-      } catch (_) { return ''; }
+      } catch (_) {
+        return '';
+      }
     },
-    getTitle: (button) => {
+    
+    getTitle: (button): string => {
       const article = button.closest('article') || document.querySelector('article');
       if (!article) return document.title || '';
+      
       const textNodes = article.querySelectorAll('[data-testid="tweetText"]');
       let combined = '';
-      textNodes.forEach((n) => { combined += ((n.innerText || n.textContent || '').trim() + ' '); });
+      textNodes.forEach((n) => {
+        combined += ((n.textContent || '').trim() + ' ');
+      });
       combined = combined.trim();
       return combined ? combined.substring(0, 80) : (document.title || '');
     },
-    getExcerpt: (button) => {
+    
+    getExcerpt: (button): string => {
       const article = button.closest('article') || document.querySelector('article');
       if (!article) return '';
+      
       const textNodes = article.querySelectorAll('[data-testid="tweetText"]');
       let combined = '';
-      textNodes.forEach((n) => { combined += ((n.innerText || n.textContent || '').trim() + ' '); });
+      textNodes.forEach((n) => {
+        combined += ((n.textContent || '').trim() + ' ');
+      });
       combined = combined.trim();
       return combined ? combined.substring(0, 500) : '';
     }

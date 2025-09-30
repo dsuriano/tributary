@@ -1,33 +1,33 @@
 import '@testing-library/jest-dom';
-import { jest } from '@jest/globals';
+import { vi } from 'vitest';
 
 // Mock Chrome Extension APIs
 global.chrome = {
   runtime: {
     id: 'test-extension-id',
     getURL: (path) => `chrome-extension://test-extension-id/${path}`,
-    sendMessage: jest.fn(),
+    sendMessage: vi.fn(),
     onMessage: {
-      addListener: jest.fn(),
-      removeListener: jest.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
     },
     lastError: null,
   },
   storage: {
     local: {
-      get: jest.fn((keys, callback) => {
+      get: vi.fn((keys, callback) => {
         callback({});
       }),
-      set: jest.fn((items, callback) => {
+      set: vi.fn((items, callback) => {
         if (callback) callback();
       }),
-      remove: jest.fn((keys, callback) => {
+      remove: vi.fn((keys, callback) => {
         if (callback) callback();
       }),
     },
   },
   tabs: {
-    sendMessage: jest.fn(),
+    sendMessage: vi.fn(),
   },
 };
 
@@ -42,7 +42,7 @@ window.location = {
 
 // Reset mocks before each test
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   document.body.innerHTML = '';
   
   // Reset chrome.runtime.lastError

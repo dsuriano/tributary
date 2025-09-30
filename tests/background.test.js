@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, jest } from '@jest/globals';
+import { describe, test, expect, beforeEach, vi } from 'vitest';
 
 /**
  * Tests for background service worker
@@ -9,9 +9,9 @@ describe('Background Script - API Communication', () => {
   let mockFetch;
 
   beforeEach(() => {
-    mockFetch = jest.fn();
+    mockFetch = vi.fn();
     global.fetch = mockFetch;
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('raindropFetch helper', () => {
@@ -301,7 +301,7 @@ describe('Background Script - Message Handling', () => {
       }
     };
 
-    listener({ action: 'save', data: { url: 'https://example.com' } }, {}, jest.fn());
+    listener({ action: 'save', data: { url: 'https://example.com' } }, {}, vi.fn());
     expect(messages).toHaveLength(1);
     expect(messages[0].data.url).toBe('https://example.com');
   });
@@ -316,7 +316,7 @@ describe('Background Script - Message Handling', () => {
       }
     };
 
-    const mockSendResponse = jest.fn();
+    const mockSendResponse = vi.fn();
     const result = listener({ action: 'getCollections' }, {}, mockSendResponse);
     
     expect(result).toBe(true);
@@ -333,7 +333,7 @@ describe('Background Script - Message Handling', () => {
       }
     };
 
-    const mockSendResponse = jest.fn();
+    const mockSendResponse = vi.fn();
     const result = listener({ action: 'validateToken' }, {}, mockSendResponse);
     
     expect(result).toBe(true);
@@ -346,8 +346,8 @@ describe('Background Script - Message Handling', () => {
       return false;
     };
 
-    expect(listener(null, {}, jest.fn())).toBeUndefined();
-    expect(listener('string', {}, jest.fn())).toBeUndefined();
-    expect(listener(123, {}, jest.fn())).toBeUndefined();
+    expect(listener(null, {}, vi.fn())).toBeUndefined();
+    expect(listener('string', {}, vi.fn())).toBeUndefined();
+    expect(listener(123, {}, vi.fn())).toBeUndefined();
   });
 });

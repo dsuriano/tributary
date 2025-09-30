@@ -1,37 +1,83 @@
 import { TIMING, STORAGE_KEYS } from '../config/constants.js';
 import { getFromStorage } from '../config/storage.js';
+import type { SiteConfig, HookContext } from './sites/types.js';
 
-// Content script for the Tributary extension.
-//
-// This script is injected into supported social media sites (Twitter/X,
-// YouTube, Reddit) and listens for clicks on the native like/upvote
-// buttons. When such a click occurs the script performs a smart link
-// extraction algorithm to determine the correct URL to bookmark and
-// sends a message to the background service worker to create the
-// raindrop. Feedback is provided to the user via toast messages.
+/**
+ * Content script for the Tributary extension.
+ *
+ * This script is injected into supported social media sites (Twitter/X,
+ * YouTube, Reddit) and listens for clicks on the native like/upvote
+ * buttons. When such a click occurs the script performs a smart link
+ * extraction algorithm to determine the correct URL to bookmark and
+ * sends a message to the background service worker to create the
+ * raindrop. Feedback is provided to the user via toast messages.
+ */
+
+interface LastEvent {
+  x: number;
+  y: number;
+  time: number;
+}
+
+interface ToastOptions {
+  reuseActive?: boolean;
+}
+
+interface SaveMessage {
+  action: 'save';
+  data: {
+    url: string;
+    title: string;
+    excerpt: string;
+  };
+}
+
+interface SaveResultMessage {
+  type: 'saveResult';
+  status: 'success' | 'error';
+  error?: string;
+}
+
+interface RuntimeState {
+  host: string | null;
+  siteConfig: SiteConfig | null;
+  hooks: SiteConfig['hooks'];
+  buttonSelectors: string[];
+  eventsToListen: string[];
+  hookContext: HookContext | null;
+}
+
+interface StorageData {
+  [STORAGE_KEYS.ENABLED_DOMAINS]?: Record<string, boolean>;
+  [STORAGE_KEYS.DEBUG_LOGGING]?: boolean;
+}
 
 (() => {
   const DEBOUNCE_DELAY = TIMING.CONTENT_CLICK_DEBOUNCE_MS;
   const BUTTON_DEDUPE_WINDOW = TIMING.BUTTON_DEDUPE_WINDOW_MS;
-  const URL_DEDUPE_WINDOW = TIMING.URL_DEDUPE_WINDOW_MS;
   const TOAST_DURATION = TIMING.TOAST_DURATION_MS;
   const TOAST_FADE = TIMING.TOAST_FADE_MS;
+  
   let lastClickTime = 0;
   let DEBUG = false;
-  let activeToast = null;
-  let activeToastTimer = null;
-  let activeToastRemovalTimer = null;
+  let activeToast: HTMLElement | null = null;
+  let activeToastTimer: ReturnType<typeof setTimeout> | null = null;
+  let activeToastRemovalTimer: ReturnType<typeof setTimeout> | null = null;
+  
   // Track last pointer/mouse position and time to correlate with fallback scans
-  const LAST_EVENT = { x: 0, y: 0, time: 0 };
+  const LAST_EVENT: LastEvent = { x: 0, y: 0, time: 0 };
+  
   // Deduplicate saves by button element and URL within a short window
-  const processedButtonsTS = new WeakMap(); // Element -> timestamp
-  const recentUrlsTS = new Map(); // url -> timestamp
+  const processedButtonsTS = new WeakMap<Element, number>();
+  const recentUrlsTS = new Map<string, number>();
+  
   // Track last known ON state (aria-pressed/checked true) per element
-  const lastOnState = new WeakMap(); // Element -> boolean
+  const lastOnState = new WeakMap<Element, boolean>();
+  
   // Track pre-click ON state captured at input event time
-  const preClickOnState = new WeakMap(); // Element -> boolean
+  const preClickOnState = new WeakMap<Element, boolean>();
 
-  const runtime = {
+  const runtime: RuntimeState = {
     host: null,
     siteConfig: null,
     hooks: {},
@@ -42,36 +88,34 @@ import { getFromStorage } from '../config/storage.js';
 
   /**
    * Load the site configuration for the current hostname via the modular site registry.
-   * Returns a promise that resolves to a single SiteConfig object for this host.
    */
-  async function loadConfig() {
+  async function loadConfig(): Promise<SiteConfig | null> {
     const host = (window.location.hostname || '').replace(/^www\./, '');
     const module = await import(chrome.runtime.getURL('scripts/sites/index.js'));
     const loader = module.loadSiteConfigFor || module.default?.loadSiteConfigFor;
     if (typeof loader === 'function') {
       return await loader(host);
     }
-    // If registry is unavailable, return null (unsupported host)
     return null;
   }
 
-  function wait(ms = 60) {
+  function wait(ms = 60): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
    * Determine if the clicked control is transitioning to the positive state.
    * We only save when moving from neutral -> liked/upvoted, not when unliking.
-   * Uses aria attributes where available.
    */
-  async function isToggledOnAfterClick(button) {
-    // Give the UI a brief moment to update its aria-* attributes
+  async function isToggledOnAfterClick(button: Element): Promise<boolean> {
     await wait(80);
-    const inContainer = (root) => {
+    
+    const inContainer = (root: Element | null): boolean => {
       if (!root) return false;
       return !!root.querySelector('[aria-pressed="true"], [aria-checked="true"], [aria-selected="true"], .style-default-active');
     };
-    const hasPressed = (el) => {
+    
+    const hasPressed = (el: Element | null): boolean => {
       if (!el) return false;
       const ap = el.getAttribute('aria-pressed');
       const ac = el.getAttribute('aria-checked');
@@ -79,6 +123,7 @@ import { getFromStorage } from '../config/storage.js';
       const cls = el.className || '';
       return ap === 'true' || ac === 'true' || as === 'true' || (typeof cls === 'string' && cls.includes('style-default-active'));
     };
+    
     try {
       return hasPressed(button) || inContainer(button.closest('*'));
     } catch (_) {
@@ -88,9 +133,11 @@ import { getFromStorage } from '../config/storage.js';
 
   /**
    * Small utility to wait for a condition with polling.
-   * Returns a promise that resolves true if condition met within timeout, else false.
    */
-  function waitForCondition(predicate, { timeout = 1500, interval = 50 } = {}) {
+  function waitForCondition(
+    predicate: () => boolean,
+    { timeout = 1500, interval = 50 }: { timeout?: number; interval?: number } = {}
+  ): Promise<boolean> {
     return new Promise((resolve) => {
       const start = Date.now();
       const timer = setInterval(() => {
@@ -111,10 +158,8 @@ import { getFromStorage } from '../config/storage.js';
 
   /**
    * Normalise whitespace in extracted text.
-   * Collapses multiple spaces and trims leading/trailing whitespace.
-   * Limits to a max length if provided.
    */
-  function normaliseText(text, maxLen = 0) {
+  function normaliseText(text: string | null | undefined, maxLen = 0): string {
     if (!text) return '';
     let t = String(text).replace(/\s+/g, ' ').trim();
     if (maxLen > 0 && t.length > maxLen) {
@@ -123,17 +168,17 @@ import { getFromStorage } from '../config/storage.js';
     return t;
   }
 
-  function createHookContext({ attachInputListeners }) {
+  function createHookContext({ attachInputListeners }: { attachInputListeners: (root: Element | Document) => void }): HookContext {
     return {
-      host: runtime.host,
+      host: runtime.host || '',
       buttonSelectors: runtime.buttonSelectors.slice(),
       events: runtime.eventsToListen.slice(),
-      attachInputListeners: (root) => {
+      attachInputListeners: (root: Element | Document) => {
         try {
           attachInputListeners(root);
         } catch (_) { /* noop */ }
       },
-      processButton: (button) => processClick(button),
+      processButton: (button: Element) => processClick(button),
       state: {
         lastEvent: LAST_EVENT,
         processedButtonsTS,
@@ -147,18 +192,15 @@ import { getFromStorage } from '../config/storage.js';
         normaliseText
       },
       debugEnabled: () => DEBUG,
-      debugLog: (...args) => {
+      debugLog: (...args: unknown[]) => {
         if (DEBUG) console.debug('[Tributary]', ...args);
       }
     };
   }
 
-
-  /**
-   * Build a toast container if it doesn't already exist.
-   */
-  function dismissActiveToast(immediate = false) {
+  function dismissActiveToast(immediate = false): void {
     if (!activeToast) return;
+    
     if (activeToastTimer) {
       clearTimeout(activeToastTimer);
       activeToastTimer = null;
@@ -167,6 +209,7 @@ import { getFromStorage } from '../config/storage.js';
       clearTimeout(activeToastRemovalTimer);
       activeToastRemovalTimer = null;
     }
+    
     const toast = activeToast;
     if (immediate) {
       if (toast.isConnected) toast.remove();
@@ -179,24 +222,30 @@ import { getFromStorage } from '../config/storage.js';
     activeToast = null;
   }
 
-  function createToastElement() {
+  function createToastElement(): HTMLElement {
     const toast = document.createElement('div');
     toast.className = 'raindrop-toast raindrop-toast--neutral';
     toast.setAttribute('role', 'status');
+    
     const icon = document.createElement('span');
     icon.className = 'raindrop-toast__icon';
+    
     const label = document.createElement('span');
     label.className = 'raindrop-toast__label';
+    
     const progress = document.createElement('span');
     progress.className = 'raindrop-toast__progress';
+    
     toast.append(icon, label, progress);
     return toast;
   }
 
-  function applyToastState(toast, message, success) {
+  function applyToastState(toast: HTMLElement, message: string, success: boolean | null): void {
     toast.classList.remove('raindrop-toast--neutral', 'raindrop-toast--success', 'raindrop-toast--error', 'raindrop-toast--closing');
+    
     let variant = 'raindrop-toast--neutral';
     let iconGlyph = '💧';
+    
     if (success === true) {
       variant = 'raindrop-toast--success';
       iconGlyph = '✓';
@@ -204,6 +253,7 @@ import { getFromStorage } from '../config/storage.js';
       variant = 'raindrop-toast--error';
       iconGlyph = '⚠';
     }
+    
     toast.classList.add(variant);
     toast.style.setProperty('--rd-toast-duration', `${TOAST_DURATION}ms`);
 
@@ -215,7 +265,7 @@ import { getFromStorage } from '../config/storage.js';
 
     const existingProgress = toast.querySelector('.raindrop-toast__progress');
     if (existingProgress) {
-      const replacement = existingProgress.cloneNode(false);
+      const replacement = existingProgress.cloneNode(false) as HTMLElement;
       replacement.className = 'raindrop-toast__progress';
       existingProgress.replaceWith(replacement);
     } else {
@@ -225,7 +275,7 @@ import { getFromStorage } from '../config/storage.js';
     }
   }
 
-  function scheduleToastLifecycle(toast) {
+  function scheduleToastLifecycle(toast: HTMLElement): void {
     if (activeToastTimer) {
       clearTimeout(activeToastTimer);
       activeToastTimer = null;
@@ -234,6 +284,7 @@ import { getFromStorage } from '../config/storage.js';
       clearTimeout(activeToastRemovalTimer);
       activeToastRemovalTimer = null;
     }
+    
     activeToastTimer = setTimeout(() => {
       toast.classList.add('raindrop-toast--closing');
       activeToastRemovalTimer = setTimeout(() => {
@@ -247,10 +298,11 @@ import { getFromStorage } from '../config/storage.js';
     }, TOAST_DURATION);
   }
 
-  function ensureToastStyles() {
+  function ensureToastStyles(): void {
     if (document.getElementById('raindrop-toast-styles')) {
       return;
     }
+    
     const style = document.createElement('style');
     style.id = 'raindrop-toast-styles';
     style.textContent = `
@@ -298,127 +350,94 @@ import { getFromStorage } from '../config/storage.js';
         position: absolute;
         width: 160px;
         height: 160px;
-        top: -80px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.4), transparent 70%);
+        top: -60px;
         right: -60px;
-        background: radial-gradient(circle, rgba(255, 255, 255, 0.45), transparent 60%);
-        filter: blur(10px);
-        opacity: 0.8;
-        animation: rd-toast-orbit 6s ease-in-out infinite;
+        mix-blend-mode: overlay;
       }
       .raindrop-toast__icon {
         position: absolute;
-        left: 16px;
+        left: 18px;
         top: 50%;
         transform: translateY(-50%);
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.55));
-        display: grid;
-        place-items: center;
-        color: #3a2b6d;
-        font-size: 18px;
-        box-shadow: 0 6px 18px rgba(24, 24, 37, 0.2);
+        font-size: 20px;
+        line-height: 1;
       }
       .raindrop-toast__label {
+        display: block;
         position: relative;
         z-index: 1;
-        display: block;
       }
       .raindrop-toast__progress {
         position: absolute;
-        left: 52px;
-        right: 18px;
-        bottom: 10px;
+        bottom: 0;
+        left: 0;
         height: 3px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.25);
-        overflow: hidden;
-      }
-      .raindrop-toast__progress::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(90deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.3));
-        transform: translateX(-100%);
-        animation: rd-toast-progress var(--rd-toast-duration, 3600ms) linear forwards;
+        background: rgba(255, 255, 255, 0.5);
+        width: 100%;
+        transform-origin: left;
+        animation: rd-toast-progress var(--rd-toast-duration, 3000ms) linear forwards;
       }
       .raindrop-toast--neutral {
-        background: linear-gradient(135deg, rgba(85, 110, 255, 0.92), rgba(163, 103, 255, 0.9));
+        background: linear-gradient(135deg, rgba(58, 70, 95, 0.95), rgba(42, 52, 75, 0.96));
       }
       .raindrop-toast--success {
-        background: linear-gradient(135deg, rgba(46, 201, 140, 0.95), rgba(66, 201, 255, 0.9));
+        background: linear-gradient(135deg, rgba(52, 168, 83, 0.95), rgba(39, 140, 67, 0.96));
       }
       .raindrop-toast--error {
-        background: linear-gradient(135deg, rgba(255, 105, 115, 0.96), rgba(255, 162, 105, 0.9));
+        background: linear-gradient(135deg, rgba(234, 67, 53, 0.95), rgba(211, 47, 47, 0.96));
       }
       .raindrop-toast--closing {
-        animation: rd-toast-leave 0.45s ease forwards;
+        animation: rd-toast-exit 0.5s cubic-bezier(0.36, 0, 0.66, -0.56) forwards;
       }
       @keyframes rd-toast-enter {
-        0% { opacity: 0; transform: translateY(-16px) scale(0.96); }
-        60% { opacity: 1; transform: translateY(4px) scale(1.02); }
-        100% { opacity: 1; transform: translateY(0) scale(1); }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
       }
-      @keyframes rd-toast-leave {
-        0% { opacity: 1; transform: translateY(0) scale(1); }
-        100% { opacity: 0; transform: translateY(-12px) scale(0.94); }
-      }
-      @keyframes rd-toast-orbit {
-        0% { opacity: 0.7; transform: rotate(0deg) translate(0, 0); }
-        50% { opacity: 1; transform: rotate(12deg) translate(-4px, 6px); }
-        100% { opacity: 0.7; transform: rotate(0deg) translate(0, 0); }
+      @keyframes rd-toast-exit {
+        to {
+          opacity: 0;
+          transform: translateY(-16px) scale(0.92);
+        }
       }
       @keyframes rd-toast-progress {
-        from { transform: translateX(-100%); }
-        to { transform: translateX(0); }
+        from {
+          transform: scaleX(1);
+        }
+        to {
+          transform: scaleX(0);
+        }
       }
     `;
-    (document.head || document.documentElement || document.body).appendChild(style);
+    document.head.appendChild(style);
   }
 
-  function ensureToastContainer() {
+  function ensureToastContainer(): HTMLElement {
     ensureToastStyles();
     let container = document.getElementById('raindrop-toast-container');
     if (!container) {
       container = document.createElement('div');
       container.id = 'raindrop-toast-container';
-      Object.assign(container.style, {
-        position: 'fixed',
-        top: '24px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: '2147483647',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '12px',
-        pointerEvents: 'none'
-      });
       document.body.appendChild(container);
     }
     return container;
   }
 
   /**
-   * Display a toast message at the bottom of the page. Messages fade
-   * out automatically after three seconds. An optional `success`
-   * parameter may be provided to colour the toast green for success or
-   * red for errors. If omitted a neutral dark colour is used.
-   *
-   * @param {string} message Text to display.
-   * @param {boolean|null} success Outcome state: true for success,
-   *   false for error, null/undefined for neutral/in-progress.
+   * Display a toast message at the bottom of the page.
    */
-  function showToast(message, success = null, options = {}) {
+  function showToast(message: string, success: boolean | null = null, options: ToastOptions = {}): HTMLElement {
     const opts = (options && typeof options === 'object') ? options : {};
     const reuseActive = !!opts.reuseActive;
     const container = ensureToastContainer();
     const canReuseActive = reuseActive && activeToast && activeToast.isConnected;
 
-    let toast;
+    let toast: HTMLElement;
     if (canReuseActive) {
-      toast = activeToast;
+      toast = activeToast!;
       toast.classList.remove('raindrop-toast--closing');
     } else {
       if (activeToast && activeToast.isConnected) {
@@ -437,16 +456,11 @@ import { getFromStorage } from '../config/storage.js';
   }
 
   /**
-   * Traverse up the DOM tree from a target element to find the first
-   * element that matches one of the provided selectors.
-   *
-   * @param {Element} el The element on which the event occurred.
-   * @param {string[]} selectors A list of CSS selectors to test.
-   * @returns {Element|null} The matching element or null if none found.
+   * Traverse up the DOM tree to find a matching element.
    */
-  function findButton(el, selectors) {
-    let current = el;
-    while (current && current !== document && current.nodeType === Node.ELEMENT_NODE) {
+  function findButton(el: EventTarget | null, selectors: string[]): Element | null {
+    let current = el as Element | null;
+    while (current && current !== document.documentElement && current.nodeType === Node.ELEMENT_NODE) {
       for (const sel of selectors) {
         if (typeof sel === 'string' && current.matches && current.matches(sel)) {
           return current;
@@ -457,17 +471,19 @@ import { getFromStorage } from '../config/storage.js';
     return null;
   }
 
-  // When events originate inside Shadow DOM, walking parentElement may not cross
-  // the shadow boundary. Prefer scanning the composed path for a direct match.
-  function findButtonInComposedPath(event, selectors) {
+  /**
+   * Scan the composed path for Shadow DOM support.
+   */
+  function findButtonInComposedPath(event: Event, selectors: string[]): Element | null {
     try {
       if (!event || typeof event.composedPath !== 'function') return null;
       const path = event.composedPath();
       for (const node of path) {
-        if (node && node.nodeType === Node.ELEMENT_NODE) {
+        if (node && (node as Node).nodeType === Node.ELEMENT_NODE) {
+          const element = node as Element;
           for (const sel of selectors) {
-            if (typeof sel === 'string' && node.matches && node.matches(sel)) {
-              return node;
+            if (typeof sel === 'string' && element.matches && element.matches(sel)) {
+              return element;
             }
           }
         }
@@ -478,22 +494,10 @@ import { getFromStorage } from '../config/storage.js';
 
   /**
    * Extract the URL to bookmark based on the smart link extraction algorithm.
-   *
-   * Step A: ascend to the nearest container matching one of the
-   * provided container selectors. If none match the current document
-   * is used as the container.
-   * Step B: search the container for an <a> element whose href
-   * resolves to a domain different to the current page. Return the
-   * first such link.
-   * Step C: fall back to the canonical URL of the page or, if absent,
-   * the current page URL.
-   *
-   * @param {Element} button The clicked button.
-   * @param {string[]} containerSelectors Possible selectors for the content container.
-   * @returns {string} The determined URL to save.
    */
-  function extractLink(button, containerSelectors) {
-    let container = null;
+  function extractLink(button: Element, containerSelectors: string | string[]): string {
+    let container: Element | Document | null = null;
+    
     if (Array.isArray(containerSelectors)) {
       for (const sel of containerSelectors) {
         if (sel && typeof sel === 'string') {
@@ -507,18 +511,20 @@ import { getFromStorage } from '../config/storage.js';
     } else if (typeof containerSelectors === 'string') {
       container = button.closest(containerSelectors);
     }
+    
     if (!container) {
       container = document;
     }
-    // Step B: find external link
-    const anchors = container.querySelectorAll('a[href]');
+    
+    // Find external link
+    const anchors = Array.from(container.querySelectorAll('a[href]'));
     for (const anchor of anchors) {
       const href = anchor.getAttribute('href');
       if (!href) continue;
-      // Skip anchors with hashes or javascript pseudo links
       if (href.startsWith('#') || href.startsWith('javascript:')) continue;
+      
       try {
-        const url = new URL(anchor.href, document.baseURI);
+        const url = new URL((anchor as HTMLAnchorElement).href, document.baseURI);
         if (url.hostname && url.hostname !== window.location.hostname) {
           return url.href;
         }
@@ -526,56 +532,48 @@ import { getFromStorage } from '../config/storage.js';
         // ignore malformed URLs
       }
     }
-    // Step C: canonical or page URL
-    const canonicalEl = document.querySelector('link[rel="canonical"]');
-    if (canonicalEl && canonicalEl.href) {
+    
+    // Canonical or page URL
+    const canonicalEl = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+    if (canonicalEl?.href) {
       return canonicalEl.href;
     }
     return window.location.href;
   }
 
   /**
-   * Compute permalink using a site-specific hook if provided; otherwise
-   * fall back to the generic extractLink().
-   * @param {Element} button
-   * @param {object} siteConfig
-   * @returns {string}
+   * Compute permalink using site-specific hook or fallback.
    */
-  async function computePermalink(button) {
+  async function computePermalink(button: Element): Promise<string> {
     try {
       const hooks = runtime.hooks;
       const ctx = runtime.hookContext;
       if (hooks && typeof hooks.getPermalink === 'function') {
-        const v = await Promise.resolve(hooks.getPermalink(button, ctx));
+        const v = await Promise.resolve(hooks.getPermalink(button, ctx!));
         if (typeof v === 'string' && v) return v;
       }
     } catch (_) { /* ignore and fallback */ }
+    
     const siteConfig = runtime.siteConfig;
     const containerSelectors = Array.isArray(siteConfig?.containerSelector)
       ? siteConfig.containerSelector
-      : [siteConfig?.containerSelector].filter(Boolean);
+      : [siteConfig?.containerSelector].filter(Boolean) as string[];
     return extractLink(button, containerSelectors);
   }
 
   /**
-   * Handle a valid button click: extract the link and send it to the
-   * background script. A neutral toast is displayed while the network
-   * request is performed. The final outcome is handled by a listener
-   * registered in start().
-   *
-   * @param {Element} button The button that was clicked.
-   * @param {string[]} containerSelectors List of container selectors for the site.
+   * Handle a valid button click: extract the link and send it to the background script.
    */
-  async function processClick(button) {
-    const host = runtime.host;
+  async function processClick(button: Element): Promise<void> {
     const siteConfig = runtime.siteConfig;
     const hooks = runtime.hooks;
     const ctx = runtime.hookContext;
-    // Only proceed if the click resulted in toggled ON state (like/upvote on)
+    
+    // Only proceed if the click resulted in toggled ON state
     let toggledOn = false;
     try {
       if (hooks && typeof hooks.toggledOnAfterClick === 'function') {
-        const hookResult = await Promise.resolve(hooks.toggledOnAfterClick(button, ctx));
+        const hookResult = await Promise.resolve(hooks.toggledOnAfterClick(button, ctx!));
         if (hookResult === true) {
           toggledOn = true;
           if (DEBUG) console.debug('[Tributary] Hook toggle detection: ON');
@@ -592,11 +590,13 @@ import { getFromStorage } from '../config/storage.js';
     } catch (_) {
       toggledOn = await isToggledOnAfterClick(button);
     }
+    
     if (!toggledOn) {
       if (DEBUG) console.debug('[Tributary] Click ignored (toggle not ON)');
-      return; // ignore neutral->off or on->off transitions
+      return;
     }
-    // Additional protection for all hosts: require rising edge (prev OFF -> now ON)
+    
+    // Additional protection: require rising edge (prev OFF -> now ON)
     try {
       const prev = preClickOnState.get(button);
       preClickOnState.delete(button);
@@ -605,8 +605,10 @@ import { getFromStorage } from '../config/storage.js';
         return;
       }
     } catch (_) { /* ignore */ }
+    
     const url = await computePermalink(button);
-    // Deduplicate by URL to avoid double saves from multiple detectors
+    
+    // Deduplicate by URL
     try {
       const now = Date.now();
       const prev = recentUrlsTS.get(url);
@@ -616,42 +618,48 @@ import { getFromStorage } from '../config/storage.js';
       }
       recentUrlsTS.set(url, now);
     } catch (_) { /* ignore */ }
+    
     if (!url) {
       showToast('Error: Unable to extract link.', false);
       return;
     }
-    // Provide immediate feedback
+    
     showToast('Saving to Raindrop.io…', null, { reuseActive: true });
+    
     let title = document.title || '';
-    // Site hooks may override title or excerpt for richer extraction.
     let excerpt = '';
+    
     try {
       if (hooks && typeof hooks.getTitle === 'function') {
-        const t = await Promise.resolve(hooks.getTitle(button, ctx));
+        const t = await Promise.resolve(hooks.getTitle(button, ctx!));
         if (typeof t === 'string' && t) title = t;
       }
       if (hooks && typeof hooks.getExcerpt === 'function') {
-        const e = await Promise.resolve(hooks.getExcerpt(button, ctx));
+        const e = await Promise.resolve(hooks.getExcerpt(button, ctx!));
         if (typeof e === 'string' && e) excerpt = e;
       }
-    } catch (_) { /* ignore hook errors and fall back */ }
+    } catch (_) { /* ignore hook errors */ }
+    
     // Generic fallback if excerpt still empty
     if (!excerpt) {
       const containerSelectors = Array.isArray(siteConfig?.containerSelector)
         ? siteConfig.containerSelector
-        : [siteConfig?.containerSelector].filter(Boolean);
-      const container = button.closest((containerSelectors && containerSelectors[0]) || '') || document;
-      if (container && container.textContent) {
+        : [siteConfig?.containerSelector].filter(Boolean) as string[];
+      const container = button.closest((containerSelectors?.[0]) || '') || document;
+      if (container?.textContent) {
         excerpt = container.textContent.trim().substring(0, 500);
       }
     }
+    
     if (DEBUG) console.debug('[Tributary] Saving', { url, titleLen: (title||'').length, excerptLen: (excerpt||'').length });
+    
     if (!chrome?.runtime?.id) {
       if (DEBUG) console.warn('[Tributary] runtime context missing; skipping save');
       recentUrlsTS.delete(url);
       showToast('Extension restarted. Reload the page to continue.', false, { reuseActive: true });
       return;
     }
+    
     try {
       await chrome.runtime.sendMessage({
         action: 'save',
@@ -660,10 +668,10 @@ import { getFromStorage } from '../config/storage.js';
           title,
           excerpt
         }
-      });
+      } as SaveMessage);
     } catch (err) {
       recentUrlsTS.delete(url);
-      const message = (err && err.message) || '';
+      const message = (err && (err as Error).message) || '';
       if (DEBUG) console.error('[Tributary] Failed to send save message', err);
       if (typeof message === 'string' && message.includes('Extension context invalidated')) {
         showToast('Extension restarted. Reload the page to continue.', false, { reuseActive: true });
@@ -672,79 +680,87 @@ import { getFromStorage } from '../config/storage.js';
       showToast('Unable to save. Please refresh and try again.', false, { reuseActive: true });
       return;
     }
-    // Mark button as processed to avoid immediate re-processing
+    
     try { processedButtonsTS.set(button, Date.now()); } catch (_) {}
   }
 
   /**
-   * Initialise the content script: load configuration, check if the
-   * current site is enabled, then register click and message
-   * handlers.
+   * Initialize the content script.
    */
-  async function init() {
+  async function init(): Promise<void> {
     const host = window.location.hostname.replace(/^www\./, '');
     const siteConfig = await loadConfig();
+    
     if (!siteConfig) {
       return; // unsupported site
     }
+    
     runtime.host = host;
     runtime.siteConfig = siteConfig;
     runtime.hooks = (siteConfig && typeof siteConfig.hooks === 'object') ? siteConfig.hooks : {};
-    // Retrieve enablement settings
-    const stored = await getFromStorage([STORAGE_KEYS.ENABLED_DOMAINS, STORAGE_KEYS.DEBUG_LOGGING]);
+    
+    const stored = await getFromStorage<StorageData>([STORAGE_KEYS.ENABLED_DOMAINS, STORAGE_KEYS.DEBUG_LOGGING]);
     const enabled = stored[STORAGE_KEYS.ENABLED_DOMAINS] || {};
     DEBUG = !!stored[STORAGE_KEYS.DEBUG_LOGGING];
+    
     if (DEBUG) console.debug('[Tributary] Init', { host, enabled: !(Object.prototype.hasOwnProperty.call(enabled, host) && enabled[host] === false) });
+    
     // Domain is enabled by default if not explicitly set to false
     if (Object.prototype.hasOwnProperty.call(enabled, host) && enabled[host] === false) {
       return;
     }
+    
     const buttonSelectors = Array.isArray(siteConfig.buttonSelector)
-      ? siteConfig.buttonSelector.filter(Boolean)
-      : [siteConfig.buttonSelector].filter(Boolean);
+      ? siteConfig.buttonSelector.filter(Boolean) as string[]
+      : [siteConfig.buttonSelector].filter(Boolean) as string[];
     runtime.buttonSelectors = buttonSelectors;
-    const handleInputEvent = (event) => {
-        // Debounce rapid clicks
-        const now = Date.now();
-        if (now - lastClickTime < DEBOUNCE_DELAY) {
-          return;
+    
+    const handleInputEvent = (event: Event): void => {
+      const now = Date.now();
+      if (now - lastClickTime < DEBOUNCE_DELAY) {
+        return;
+      }
+      lastClickTime = now;
+      
+      // Remember pointer position/time
+      try {
+        const pt = event as MouseEvent | PointerEvent;
+        if (typeof pt.clientX === 'number' && typeof pt.clientY === 'number') {
+          LAST_EVENT.x = pt.clientX;
+          LAST_EVENT.y = pt.clientY;
+          LAST_EVENT.time = now;
         }
-        lastClickTime = now;
-        // Remember pointer position/time for proximity-based fallback
+      } catch (_) {}
+      
+      let btn = findButtonInComposedPath(event, runtime.buttonSelectors);
+      if (!btn) {
+        btn = findButton(event.target, runtime.buttonSelectors);
+      }
+      
+      if (btn) {
+        const ts = processedButtonsTS.get(btn);
+        if (ts && (Date.now() - ts) < BUTTON_DEDUPE_WINDOW) return;
+        
+        // Capture pre-click ON state
         try {
-          const pt = /** @type {MouseEvent|PointerEvent} */ (event);
-          if (typeof pt.clientX === 'number' && typeof pt.clientY === 'number') {
-            LAST_EVENT.x = pt.clientX;
-            LAST_EVENT.y = pt.clientY;
-            LAST_EVENT.time = now;
-          }
-        } catch (_) {}
-        let btn = findButtonInComposedPath(event, runtime.buttonSelectors);
-        if (!btn) {
-          btn = findButton(event.target, runtime.buttonSelectors);
-        }
-        if (btn) {
-          // Element-level dedupe window
-          const ts = processedButtonsTS.get(btn);
-          if (ts && (Date.now() - ts) < BUTTON_DEDUPE_WINDOW) return;
-          // Capture pre-click ON state to detect rising edge vs falling edge later
-          try {
-            const ap0 = btn.getAttribute('aria-pressed');
-            const ac0 = btn.getAttribute('aria-checked');
-            const wasOn = ap0 === 'true' || ac0 === 'true';
-            preClickOnState.set(btn, wasOn);
-          } catch (_) { }
-          if (DEBUG) console.debug('[Tributary] Matched button', btn);
-          processClick(btn).catch((err) => {
-            if (DEBUG) console.error('[Tributary] processClick error', err);
-          });
-        } else if (runtime.hooks && typeof runtime.hooks.handleUnmatchedClick === 'function') {
-          try {
-            runtime.hooks.handleUnmatchedClick(event, runtime.hookContext);
-          } catch (_) { /* ignore */ }
-        }
-      };
-    const attachInputListeners = (root) => {
+          const ap0 = btn.getAttribute('aria-pressed');
+          const ac0 = btn.getAttribute('aria-checked');
+          const wasOn = ap0 === 'true' || ac0 === 'true';
+          preClickOnState.set(btn, wasOn);
+        } catch (_) { }
+        
+        if (DEBUG) console.debug('[Tributary] Matched button', btn);
+        processClick(btn).catch((err) => {
+          if (DEBUG) console.error('[Tributary] processClick error', err);
+        });
+      } else if (runtime.hooks && typeof runtime.hooks.handleUnmatchedClick === 'function') {
+        try {
+          runtime.hooks.handleUnmatchedClick(event, runtime.hookContext!);
+        } catch (_) { /* ignore */ }
+      }
+    };
+    
+    const attachInputListeners = (root: Element | Document): void => {
       if (!root) return;
       try {
         for (const evt of runtime.eventsToListen) {
@@ -767,7 +783,7 @@ import { getFromStorage } from '../config/storage.js';
     }
 
     // Listen for responses from the background
-    chrome.runtime.onMessage.addListener((message) => {
+    chrome.runtime.onMessage.addListener((message: SaveResultMessage) => {
       if (message && message.type === 'saveResult') {
         if (message.status === 'success') {
           showToast('Saved to Raindrop.io!', true, { reuseActive: true });
@@ -779,7 +795,7 @@ import { getFromStorage } from '../config/storage.js';
     });
   }
 
-  // Kick off the initialisation when the content script loads
+  // Kick off initialization
   init().catch((err) => {
     console.error('Raindrop extension initialisation failed:', err);
   });

@@ -69,15 +69,15 @@ async function run({ watch = false } = {}) {
 
   const buildOptions = {
     entryPoints: {
-      'scripts/background': 'src/scripts/background.js',
-      'scripts/content_script': 'src/scripts/content_script.js',
-      // Site registry + providers (needed for dynamic imports in content script)
-      'scripts/sites/index': 'src/scripts/sites/index.js',
-      'scripts/sites/twitter': 'src/scripts/sites/twitter.js',
-      'scripts/sites/youtube': 'src/scripts/sites/youtube.js',
-      'scripts/sites/reddit': 'src/scripts/sites/reddit.js',
-      'scripts/sites/generic': 'src/scripts/sites/generic.js',
-      'options/options': 'src/options/options.js'
+      'scripts/background': 'src/scripts/background.ts',
+      'scripts/content_script': 'src/scripts/content_script.ts',
+      // Site registry + providers (TypeScript files, needed for dynamic imports)
+      'scripts/sites/index': 'src/scripts/sites/index.ts',
+      'scripts/sites/twitter': 'src/scripts/sites/twitter.ts',
+      'scripts/sites/youtube': 'src/scripts/sites/youtube.ts',
+      'scripts/sites/reddit': 'src/scripts/sites/reddit.ts',
+      'scripts/sites/generic': 'src/scripts/sites/generic.ts',
+      'options/options': 'src/options/options.ts'
     },
     bundle: true,
     outdir,
@@ -86,7 +86,8 @@ async function run({ watch = false } = {}) {
     target: 'es2020',
     platform: 'browser',
     loader: {
-      '.js': 'js'
+      '.js': 'js',
+      '.ts': 'ts'
     },
     logLevel: 'info',
     absWorkingDir: rootDir,
