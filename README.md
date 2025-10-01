@@ -1,39 +1,38 @@
 ![Tributary Banner](assets/tributary_banner.png)
 
-Tributary: The Effortless Archive for Raindrop.io
--------------------------------------------------
+## Tributary: The Effortless Archive for Raindrop.io
 
-Save interesting content from your social feeds straight into your Raindrop.io collections. Once configured, this extension listens for clicks on the native **Like**, **Bookmark**, or **Upvote** buttons on supported websites and automatically creates a bookmark in your Raindrop.io account.
+The internet is a torrent of information. Your social feeds are chaotic, fast-moving streams. But within that noise, you find gems---articles, ideas, and inspiration worth keeping. **Tributary** is the calm delta where appreciation meets preservation. It turns your simple 'like' or 'upvote' into a conscious act of curation, effortlessly channeling the best of the web into your personal library. It doesn't just save links; it honors your curiosity, one drop at a time.
 
 ### Features
 
--   **Instant Saves:** Tap Like or Upvote on Twitter/X, YouTube, or Reddit, and the extension quietly delivers the post's main link to Raindrop.io.
--   **Intelligent Link Detection:** The extension hunts for outbound links within a post and gracefully falls back to the canonical URL when no external links are available.
--   **Friendly Confirmations:** Lightweight toast messages celebrate every success and surface issues before they slow you down.
--   **Personalized Defaults:** Set your go-to collection and tags once, and every bookmark will land in the perfect spot.
--   **Domain-Level Control:** Use the options page to pause or resume the extension on individual sites with no code edits required.
--   **Built for Expansion:** Add support for more communities in minutes using modular site providers under `src/scripts/sites/` with a lightweight registry.
+- **Instant Saves:** Tap Like or Upvote on Twitter/X, YouTube, or Reddit, and the extension quietly delivers the post's main link to Raindrop.io.
+- **Intelligent Link Detection:** The extension hunts for outbound links within a post and gracefully falls back to the canonical URL when no external links are available.
+- **Friendly Confirmations:** Lightweight toast messages celebrate every success and surface issues before they slow you down.
+- **Personalized Defaults:** Set your go-to collection and tags once, and every bookmark will land in the perfect spot.
+- **Domain-Level Control:** Use the options page to pause or resume the extension on individual sites with no code edits required.
+- **Built for Expansion:** Add support for more communities in minutes using modular site providers under `src/scripts/sites/` with a lightweight registry.
 
 ### Why Use This Extension?
 
--   **Save Content Instantly:** Capture links the moment you react to them, eliminating the need for extra clicks or to copy and paste URLs into Raindrop.io later.
--   **Keep Collections Curated:** Automatically apply your preferred collection and tag defaults so everything lands exactly where you expect it.
--   **Works with Major Platforms:** Ships with first-class support for Twitter/X, YouTube, and Reddit, and is easily extensible for more sites.
--   **Respectful by Design:** Stores tokens only in `chrome.storage.local`, offers visible toast feedback, and lets you disable individual domains when you need a quieter feed experience.
+- **Save Content Instantly:** Capture links the moment you react to them, eliminating the need for extra clicks or to copy and paste URLs into Raindrop.io later.
+- **Keep Collections Curated:** Automatically apply your preferred collection and tag defaults so everything lands exactly where you expect it.
+- **Works with Major Platforms:** Ships with first-class support for Twitter/X, YouTube, and Reddit, and is easily extensible for more sites.
+- **Respectful by Design:** Stores tokens only in `chrome.storage.local`, offers visible toast feedback, and lets you disable individual domains when you need a quieter feed experience.
 
 ### Requirements
 
--   Google Chrome 110+ (or any Chromium-based browser that supports Manifest V3 and `chrome://extensions` developer mode).
--   Node.js 18+ and npm 9+ to run the build tooling.
--   A Raindrop.io account with access to generate a test token.
+- Google Chrome 110+ (or any Chromium-based browser that supports Manifest V3 and `chrome://extensions` developer mode).
+- Node.js 18+ and npm 9+ to run the build tooling.
+- A Raindrop.io account with access to generate a test token.
 
 ### Technology Stack
 
--   **TypeScript 5.3+** - 100% type-safe codebase with strict mode enabled
--   **esbuild** - Fast bundler with TypeScript support
--   **Jest** - Unit and integration testing
--   **Playwright** - End-to-end browser testing
--   **Chrome Extension Manifest V3** - Modern extension architecture
+- **TypeScript 5.3+** - 100% type-safe codebase with strict mode enabled
+- **esbuild** - Fast bundler with TypeScript support
+- **Vitest** - Unit and integration testing
+- **Playwright** - End-to-end browser testing
+- **Chrome Extension Manifest V3** - Modern extension architecture
 
 ## Setup and Installation
 
@@ -101,14 +100,14 @@ tributary/
 │        ├─ youtube.ts          # YouTube provider
 │        ├─ reddit.ts           # Reddit provider
 │        └─ generic.ts          # Fallback provider
-├─ tests/                       # Test suite (Jest + Playwright)
+├─ tests/                       # Test suite (Vitest + Playwright)
 │  ├─ sites/                    # Site provider tests
 │  ├─ e2e/                      # End-to-end tests
 │  └─ helpers/                  # Test utilities
 ├─ manifest.json                # Chrome MV3 manifest (type: module)
 ├─ package.json                 # Tooling & npm scripts
 ├─ tsconfig.json                # TypeScript configuration
-├─ jest.config.js               # Jest configuration
+├─ vitest.config.ts             # Vitest configuration
 ├─ playwright.config.js         # Playwright configuration
 ├─ LICENSE                      # MIT license
 ├─ TESTING.md                   # Testing guide
@@ -120,10 +119,11 @@ tributary/
 
 ### Permissions
 
- To allow the extension to create bookmarks, you need a **test token** from Raindrop.io:
- 1. Log in to your Raindrop.io account.
- 2. Go to **Settings → Integrations** and locate the **API** section.
- 3. Click **Get test token** and copy the generated token. This token is used as a Bearer token in the `Authorization` header for every API call.
+To allow the extension to create bookmarks, you need a **test token** from Raindrop.io:
+
+1.  Log in to your Raindrop.io account.
+2.  Go to **Settings → Integrations** and locate the **API** section.
+3.  Click **Get test token** and copy the generated token. This token is used as a Bearer token in the `Authorization` header for every API call.
 
 Test tokens are scoped to your account and can be revoked at any time. Store it carefully; the extension only saves it locally using `chrome.storage.local`.
 
@@ -140,9 +140,9 @@ When configured correctly, the status indicator will show **Connected** and your
 
 ### Using the Extension
 
--   **On Twitter/X**, click the ❤️ **Like** button beneath a tweet. 
--   **On YouTube**, click the 👍 **Like** button beneath a video. 
--   **On Reddit**, click the ⬆️ **Upvote** button on a post. 
+- **On Twitter/X**, click the ❤️ **Like** button beneath a tweet.
+- **On YouTube**, click the 👍 **Like** button beneath a video.
+- **On Reddit**, click the ⬆️ **Upvote** button on a post.
 
 A toast message will appear briefly confirming that the bookmark was saved. If the API token is invalid or the Raindrop.io API returns an error (including 429 rate limits), the toast will display an error message.
 
@@ -212,9 +212,9 @@ const example: SiteConfig = {
     getTitle: (_button, ctx) => ctx.utils.normaliseText(document.title, 200),
     getExcerpt: (button, ctx) => {
       const container = button.closest('article') || document;
-      return ctx.utils.normaliseText((container.textContent || ''), 500);
-    }
-  }
+      return ctx.utils.normaliseText(container.textContent || '', 500);
+    },
+  },
 };
 
 export default example;
@@ -224,19 +224,28 @@ export default example;
 
 ```js
 const providers = [
-  { match: ['twitter.com', 'x.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/twitter.js')) },
-  { match: ['youtube.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/youtube.js')) },
+  {
+    match: ['twitter.com', 'x.com'],
+    loader: () => import(chrome.runtime.getURL('scripts/sites/twitter.js')),
+  },
+  {
+    match: ['youtube.com'],
+    loader: () => import(chrome.runtime.getURL('scripts/sites/youtube.js')),
+  },
   { match: ['reddit.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/reddit.js')) },
-  { match: ['example.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/example.js')) },
+  {
+    match: ['example.com'],
+    loader: () => import(chrome.runtime.getURL('scripts/sites/example.js')),
+  },
 ];
 ```
 
 **Guidelines:**
 
--   Use stable attributes like `data-testid` or `aria-label` when possible.
--   Prefer returning stable permalinks in the `getPermalink` hook.
--   Keep hooks small and resilient to prevent errors from missing nodes.
--   Rebuild (`npm run build`) and reload the extension. Ensure the new domain shows up under Enabled Domains in the Options page (which reads from the registry) and is included in `manifest.json` `host_permissions`/`content_scripts.matches` if needed.
+- Use stable attributes like `data-testid` or `aria-label` when possible.
+- Prefer returning stable permalinks in the `getPermalink` hook.
+- Keep hooks small and resilient to prevent errors from missing nodes.
+- Rebuild (`npm run build`) and reload the extension. Ensure the new domain shows up under Enabled Domains in the Options page (which reads from the registry) and is included in `manifest.json` `host_permissions`/`content_scripts.matches` if needed.
 
 #### Provider Template
 
@@ -258,17 +267,23 @@ The registry supports wildcard domain patterns in `match`, e.g. `*.medium.com`. 
 ```js
 const providers = [
   // Matches medium.com and any subdomain like blog.medium.com
-  { match: ['*.medium.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/medium.js')) },
+  {
+    match: ['*.medium.com'],
+    loader: () => import(chrome.runtime.getURL('scripts/sites/medium.js')),
+  },
   // Matches the apex exactly
-  { match: ['example.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/example.js')) },
+  {
+    match: ['example.com'],
+    loader: () => import(chrome.runtime.getURL('scripts/sites/example.js')),
+  },
 ];
 ```
 
 ### Known Limitations
 
--   **"Unlike" actions are ignored.** Only positive clicks (Like, Upvote) trigger bookmarking. This prevents accidental deletion from your Raindrop.io collection.
--   **Rate Limiting.** The Raindrop.io API limits requests. The extension applies a simple backoff if a 429 response is received, but rapid clicks may still result in temporary failures.
--   **Link Extraction.** The algorithm picks the first external link it finds in a post. There is currently no way to choose which link is saved if a post contains multiple.
+- **"Unlike" actions are ignored.** Only positive clicks (Like, Upvote) trigger bookmarking. This prevents accidental deletion from your Raindrop.io collection.
+- **Rate Limiting.** The Raindrop.io API limits requests. The extension applies a simple backoff if a 429 response is received, but rapid clicks may still result in temporary failures.
+- **Link Extraction.** The algorithm picks the first external link it finds in a post. There is currently no way to choose which link is saved if a post contains multiple.
 
 ### Testing
 
@@ -290,6 +305,7 @@ npm run test:e2e
 ```
 
 See `TESTING.md` for detailed testing documentation, including:
+
 - Writing new tests
 - Test structure and patterns
 - Coverage goals
@@ -301,6 +317,7 @@ See `TESTING.md` for detailed testing documentation, including:
 Pull requests and suggestions are welcome. See `CONTRIBUTING.md` for development setup and coding style. Please follow the `CODE_OF_CONDUCT.md`.
 
 **Before submitting a PR:**
+
 1. Run `npm test` to ensure all tests pass
 2. Run `npm run test:coverage` to verify coverage thresholds
 3. Add tests for new features
@@ -308,10 +325,10 @@ Pull requests and suggestions are welcome. See `CONTRIBUTING.md` for development
 
 ### Debugging
 
--   Enable "Debug logging" in the Options page to get verbose logs from the service worker.
--   To view service worker logs, go to `chrome://extensions`, find the extension, and click the "Service worker" link.
--   For content script logs, open the browser's DevTools on the tab where you are testing.
--   Run tests with `npm test -- --verbose` for detailed output.
+- Enable "Debug logging" in the Options page to get verbose logs from the service worker.
+- To view service worker logs, go to `chrome://extensions`, find the extension, and click the "Service worker" link.
+- For content script logs, open the browser's DevTools on the tab where you are testing.
+- Run tests with `npm test -- --verbose` for detailed output.
 
 ### License
 

@@ -15,13 +15,13 @@ This document describes the testing strategy and how to run tests for the Tribut
 
 The Tributary extension uses a multi-layered testing approach:
 
-1. **Unit Tests** (Jest) - Test individual functions and modules
-2. **Integration Tests** (Jest) - Test API communication and storage
+1. **Unit Tests** (Vitest) - Test individual functions and modules
+2. **Integration Tests** (Vitest) - Test API communication and storage
 3. **E2E Tests** (Playwright) - Test the extension in a real browser
 
 ### Testing Stack
 
-- **Jest 29** - Unit and integration testing
+- **Vitest 3** - Unit and integration testing
 - **@testing-library/dom** - DOM testing utilities
 - **Playwright** - End-to-end browser testing
 - **jsdom** - Browser environment simulation
@@ -30,7 +30,7 @@ The Tributary extension uses a multi-layered testing approach:
 
 ```
 tests/
-├── setup.js                    # Jest setup and Chrome API mocks
+├── setup.js                    # Vitest setup and Chrome API mocks
 ├── helpers/
 │   └── dom-helpers.js         # Reusable DOM creation utilities
 ├── sites/
@@ -98,7 +98,7 @@ npm run test:e2e:ui
 #### Testing Site Providers
 
 ```javascript
-import { describe, test, expect, beforeEach } from '@jest/globals';
+import { describe, test, expect, beforeEach } from 'vitest';
 import twitter from '../../src/scripts/sites/twitter.js';
 import { createTwitterPost, setToggleState } from '../helpers/dom-helpers.js';
 
@@ -139,7 +139,7 @@ describe('Background Script - API', () => {
   let mockFetch;
 
   beforeEach(() => {
-    mockFetch = jest.fn();
+    mockFetch = vi.fn();
     global.fetch = mockFetch;
   });
 
@@ -218,7 +218,7 @@ setToggleState(button, true); // aria-pressed="true"
 
 ## Coverage Goals
 
-Current coverage thresholds (defined in `jest.config.js`):
+Current coverage thresholds (defined in `vitest.config.ts`):
 
 - **Branches**: 60%
 - **Functions**: 60%
@@ -257,7 +257,7 @@ Workflow: `.github/workflows/test.yml`
 
 #### Jobs
 
-1. **unit-tests** - Runs Jest tests with coverage
+1. **unit-tests** - Runs Vitest tests with coverage
 2. **build-test** - Verifies extension builds successfully
 3. **e2e-tests** - Runs Playwright E2E tests
 
@@ -281,14 +281,14 @@ npm run test:e2e
 
 ## Debugging Tests
 
-### Jest Tests
+### Vitest Tests
 
 ```bash
 # Run with verbose output
 npm test -- --verbose
 
 # Run single test file with debugging
-node --inspect-brk node_modules/.bin/jest tests/sites/twitter.test.js
+npx vitest tests/sites/twitter.test.js
 
 # Use console.log in tests (will show in output)
 test('debug test', () => {
@@ -312,9 +312,9 @@ npx playwright test --debug tests/e2e/extension-setup.spec.js
 
 ## Common Issues
 
-### Jest: "Cannot use import statement outside a module"
+### Vitest: "Cannot use import statement outside a module"
 
-**Solution**: Ensure `"type": "module"` is in `package.json` and use the `--experimental-vm-modules` flag (already configured in npm scripts).
+**Solution**: Ensure `"type": "module"` is in `package.json`. Vitest handles ES modules natively.
 
 ### Playwright: "Extension not loaded"
 
@@ -329,7 +329,7 @@ npx playwright test --debug tests/e2e/extension-setup.spec.js
 
 ```javascript
 global.chrome.someNewAPI = {
-  method: jest.fn(),
+  method: vi.fn(),
 };
 ```
 
@@ -343,7 +343,7 @@ test('slow test', async () => {
   // ...
 }, 30000); // 30 second timeout
 
-// In jest.config.js
+// In vitest.config.ts
 testTimeout: 10000, // 10 seconds default
 ```
 
@@ -354,7 +354,7 @@ testTimeout: 10000, // 10 seconds default
 ❌ **Bad**:
 ```javascript
 test('should call extractLink function', () => {
-  const spy = jest.spyOn(module, 'extractLink');
+  const spy = vi.spyOn(module, 'extractLink');
   // ...
   expect(spy).toHaveBeenCalled();
 });
@@ -405,7 +405,7 @@ test('should save bookmark', () => {
 ```javascript
 beforeEach(() => {
   document.body.innerHTML = '';
-  jest.clearAllMocks();
+  vi.clearAllMocks();
 });
 ```
 
@@ -422,7 +422,7 @@ describe('Link Extraction', () => {
 
 ## Resources
 
-- [Jest Documentation](https://jestjs.io/docs/getting-started)
+- [Vitest Documentation](https://vitest.dev/guide/)
 - [Testing Library](https://testing-library.com/docs/)
 - [Playwright Documentation](https://playwright.dev/)
 - [Chrome Extension Testing](https://developer.chrome.com/docs/extensions/mv3/tut_testing/)

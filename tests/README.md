@@ -42,7 +42,7 @@ npm run test:e2e:ui
 
 ```
 tests/
-├── setup.js                    # Jest configuration & Chrome API mocks
+├── setup.js                    # Vitest configuration & Chrome API mocks
 ├── helpers/
 │   └── dom-helpers.js         # Utilities for creating test DOM
 ├── sites/
@@ -87,8 +87,8 @@ npm test -- --verbose
 ### Debugging
 
 ```bash
-# Debug Jest tests
-node --inspect-brk node_modules/.bin/jest tests/sites/twitter.test.js
+# Debug Vitest tests
+npx vitest tests/sites/twitter.test.js
 
 # Debug Playwright tests
 npx playwright test --debug tests/e2e/extension-setup.spec.js
@@ -103,7 +103,7 @@ npx playwright test --debug tests/e2e/extension-setup.spec.js
 **Solution**: Run `npm run build` before E2E tests.
 
 ### Tests timeout
-**Solution**: Increase timeout in `jest.config.js` or specific test:
+**Solution**: Increase timeout in `vitest.config.ts` or specific test:
 ```javascript
 test('slow test', async () => {
   // ...
