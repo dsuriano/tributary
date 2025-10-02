@@ -67,13 +67,13 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
     npm run dev
     ```
 
-4.  **Load Tributary in Chrome**
+### Load Tributary in Chrome
 
-    a. Open Google Chrome and navigate to `chrome://extensions/`.
-    b. Toggle **Developer mode** on in the top-right corner.
-    c. Click **Load unpacked** and select the `dist/` directory from this project.
-    d. Tributary will appear in your list. Pin it to the toolbar for easy access.
-    e. If you are running the `dev` watcher, click the **Refresh** button on Tributary card in `chrome://extensions/` to load your changes.
+- Open Google Chrome and navigate to `chrome://extensions/`.
+- Toggle **Developer mode** on in the top-right corner.
+- Click **Load unpacked** and select the `dist/` directory from this project.
+- Tributary will appear in your list. Pin it to the toolbar for easy access.
+- If you are running the `dev` watcher, click the **Refresh** button on the Tributary card in `chrome://extensions/` to load your changes.
 
 ### Project Structure
 
