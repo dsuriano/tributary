@@ -23,7 +23,7 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
 ### Requirements
 
 - Google Chrome 110+ (or any Chromium-based browser that supports Manifest V3 and `chrome://extensions` developer mode).
-- Node.js 18+ and npm 9+ to run the build tooling.
+- Node.js 20+ and npm 10+ to run the build tooling.
 - A Raindrop.io account with access to generate a test token.
 
 ### Technology Stack

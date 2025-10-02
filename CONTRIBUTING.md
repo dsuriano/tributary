@@ -4,7 +4,7 @@ Thanks for your interest in contributing! This project uses an esbuild-based wor
 
 ## Local development
 
-- Requirements: Node.js 18+ and npm 9+
+- Requirements: Node.js 20+ and npm 10+
 - Install dependencies:
   - `npm install`
 - Start the dev watcher (rebuilds on change):
