@@ -18,7 +18,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
@@ -37,6 +37,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: tributary-extension.zip
-          body: "See the [CHANGELOG.md](CHANGELOG.md) for details."
+          body: 'See the [CHANGELOG.md](CHANGELOG.md) for details.'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
