@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * Custom fixture that loads the extension
+ * Custom fixture that loads Tributary
  */
 export const test = base.extend({
   context: async ({}, use) => {
@@ -22,7 +22,7 @@ export const test = base.extend({
     await use(context);
     await context.close();
   },
-  
+
   extensionId: async ({ context }, use) => {
     // Get extension ID from background page
     let [background] = context.serviceWorkers();

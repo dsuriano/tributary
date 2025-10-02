@@ -18,7 +18,7 @@
     "raindrop",
     "tributary"
   ],
-  "author": "",
+  "author": "Tributary Contributors",
   "license": "MIT",
   "devDependencies": {
     "@playwright/test": "^1.40.1",

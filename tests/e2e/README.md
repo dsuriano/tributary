@@ -4,7 +4,8 @@ End-to-end tests for the Tributary extension using Playwright.
 
 ## Prerequisites
 
-1. Build the extension first:
+1. Build Tributary first:
+
    ```bash
    npm run build
    ```
@@ -42,7 +43,7 @@ test('test name', async ({ context, extensionId }) => {
 ### Available Fixtures
 
 - `context`: Browser context with extension loaded
-- `extensionId`: The extension's ID (useful for navigating to extension pages)
+- `extensionId`: Tributary's ID (useful for navigating to extension pages)
 
 ### Testing on Real Sites
 
@@ -58,17 +59,17 @@ Example:
 test('should detect like button on Twitter', async ({ context, page }) => {
   // Navigate to a test Twitter page or mock HTML
   await page.goto('https://twitter.com/test');
-  
+
   // Mock the background script response
   await page.evaluate(() => {
     chrome.runtime.sendMessage = async (msg) => {
       return { type: 'saveResult', status: 'success' };
     };
   });
-  
+
   // Click like button
   await page.click('[data-testid="like"]');
-  
+
   // Verify toast appears
   await expect(page.locator('.raindrop-toast--success')).toBeVisible();
 });

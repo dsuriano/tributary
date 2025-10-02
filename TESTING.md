@@ -17,7 +17,7 @@ The Tributary extension uses a multi-layered testing approach:
 
 1. **Unit Tests** (Vitest) - Test individual functions and modules
 2. **Integration Tests** (Vitest) - Test API communication and storage
-3. **E2E Tests** (Playwright) - Test the extension in a real browser
+3. **E2E Tests** (Playwright) - Test Tributary in a real browser
 
 ### Testing Stack
 
@@ -78,7 +78,7 @@ npm test -- --testNamePattern="Twitter Provider"
 ### E2E Tests
 
 ```bash
-# Build the extension first (required!)
+# Build Tributary first (required!)
 npm run build
 
 # Install Playwright browsers (first time only)
@@ -126,7 +126,7 @@ describe('Link Extraction', () => {
     const link = document.createElement('a');
     link.href = 'https://example.com/article';
     article.appendChild(link);
-    
+
     // Test your extraction logic
   });
 });
@@ -161,10 +161,10 @@ import { test, expect } from './fixtures.js';
 
 test('should load extension', async ({ context, extensionId }) => {
   expect(extensionId).toBeTruthy();
-  
+
   const optionsPage = await context.newPage();
   await optionsPage.goto(`chrome-extension://${extensionId}/options/options.html`);
-  
+
   await expect(optionsPage.locator('h2').first()).toBeVisible();
 });
 ```
@@ -232,24 +232,26 @@ npm run test:coverage
 ```
 
 Coverage reports are generated in:
+
 - `coverage/lcov-report/index.html` - HTML report (open in browser)
 - `coverage/lcov.info` - LCOV format (for CI tools)
 
 ### Coverage by Module
 
-| Module | Target Coverage | Priority |
-|--------|----------------|----------|
-| Site Providers | 80%+ | High |
-| Content Script | 70%+ | High |
-| Background Script | 75%+ | High |
-| Storage Utilities | 90%+ | Medium |
-| Constants | 100% | Low |
+| Module            | Target Coverage | Priority |
+| ----------------- | --------------- | -------- |
+| Site Providers    | 80%+            | High     |
+| Content Script    | 70%+            | High     |
+| Background Script | 75%+            | High     |
+| Storage Utilities | 90%+            | Medium   |
+| Constants         | 100%            | Low      |
 
 ## CI/CD Integration
 
 ### GitHub Actions
 
 Tests run automatically on:
+
 - Push to `main` or `develop` branches
 - Pull requests to `main` or `develop`
 
@@ -318,7 +320,8 @@ npx playwright test --debug tests/e2e/extension-setup.spec.js
 
 ### Playwright: "Extension not loaded"
 
-**Solution**: 
+**Solution**:
+
 1. Run `npm run build` before E2E tests
 2. Check that `dist/` directory exists and contains built files
 3. Verify `manifest.json` is in `dist/`
@@ -352,6 +355,7 @@ testTimeout: 10000, // 10 seconds default
 ### 1. Test Behavior, Not Implementation
 
 ❌ **Bad**:
+
 ```javascript
 test('should call extractLink function', () => {
   const spy = vi.spyOn(module, 'extractLink');
@@ -361,6 +365,7 @@ test('should call extractLink function', () => {
 ```
 
 ✅ **Good**:
+
 ```javascript
 test('should extract external link from post', () => {
   const post = createTwitterPost({ hasExternalLink: true });
@@ -372,13 +377,19 @@ test('should extract external link from post', () => {
 ### 2. Use Descriptive Test Names
 
 ❌ **Bad**:
+
 ```javascript
-test('test 1', () => { /* ... */ });
+test('test 1', () => {
+  /* ... */
+});
 ```
 
 ✅ **Good**:
+
 ```javascript
-test('should extract tweet permalink and remove query parameters', () => { /* ... */ });
+test('should extract tweet permalink and remove query parameters', () => {
+  /* ... */
+});
 ```
 
 ### 3. Arrange-Act-Assert Pattern
@@ -388,11 +399,11 @@ test('should save bookmark', () => {
   // Arrange
   const post = createTwitterPost();
   document.body.appendChild(post);
-  
+
   // Act
   const button = document.querySelector('[data-testid="like"]');
   simulateClick(button);
-  
+
   // Assert
   expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
     expect.objectContaining({ action: 'save' })
@@ -413,10 +424,18 @@ beforeEach(() => {
 
 ```javascript
 describe('Link Extraction', () => {
-  test('should handle normal case', () => { /* ... */ });
-  test('should handle no links', () => { /* ... */ });
-  test('should handle malformed URLs', () => { /* ... */ });
-  test('should handle null container', () => { /* ... */ });
+  test('should handle normal case', () => {
+    /* ... */
+  });
+  test('should handle no links', () => {
+    /* ... */
+  });
+  test('should handle malformed URLs', () => {
+    /* ... */
+  });
+  test('should handle null container', () => {
+    /* ... */
+  });
 });
 ```
 

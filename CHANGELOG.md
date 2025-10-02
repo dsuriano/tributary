@@ -9,21 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- (Your new feature here)
+- Nothing yet.
 
 ### Changed
 
-- (A change in existing functionality)
+- Nothing yet.
 
 ### Fixed
 
-- (A bug fix)
+- Nothing yet.
 
-## [1.0.0] - 2025-09-27
+## [1.0.0] - 2025-10-01
 
 ### Added
 
-- Initial release of the Tributary extension.
-- Support for saving links from Twitter/X, YouTube, and Reddit.
-- Configuration page for API token, default collection, and tags.
-- Automatic release packaging with GitHub Actions.
+- Initial release of the Tributary Chrome extension for Raindrop.io.
+- One-click saves triggered by likes or upvotes on Twitter/X, YouTube, and Reddit.
+- Intelligent outbound link detection with canonical URL fallback.
+- Toast-based success and error feedback for background saves.
+- Options page for managing API tokens, default collections, tags, and per-domain enablement.
+- Modular site provider registry under `src/scripts/sites/` for rapid expansion to new platforms.
+- Background service worker integration with the Raindrop.io API, including rate-limit backoff.
+- Comprehensive tooling: TypeScript, esbuild bundler, Vitest unit tests, and Playwright end-to-end tests.
+- GitHub Actions workflow for automated packaging and release artifacts.

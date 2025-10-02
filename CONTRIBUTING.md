@@ -9,11 +9,11 @@ Thanks for your interest in contributing! This project uses an esbuild-based wor
   - `npm install`
 - Start the dev watcher (rebuilds on change):
   - `npm run dev`
-- Load the extension unpacked:
+- Load Tributary unpacked:
   - Open `chrome://extensions`
   - Enable Developer Mode
   - Click "Load unpacked" and select the `dist/` directory (built output)
-- During development, after changes rebuild, click the Refresh icon on the extension card in `chrome://extensions`.
+- During development, after changes rebuild, click the Refresh icon on Tributary card in `chrome://extensions`.
 
 ## Code style
 
@@ -25,7 +25,7 @@ Thanks for your interest in contributing! This project uses an esbuild-based wor
 
 Add a new provider module under `src/scripts/sites/` and register it in the registry at `src/scripts/sites/index.js`.
 
-1) Create a file, e.g. `src/scripts/sites/example.js`:
+1. Create a file, e.g. `src/scripts/sites/example.js`:
 
 ```js
 // Example provider for example.com
@@ -46,34 +46,43 @@ const example = {
     getTitle: (_button, ctx) => ctx.utils.normaliseText(document.title, 200),
     getExcerpt: (button, ctx) => {
       const container = button.closest('article') || document;
-      return ctx.utils.normaliseText((container.textContent || ''), 500);
-    }
-  }
+      return ctx.utils.normaliseText(container.textContent || '', 500);
+    },
+  },
 };
 
 export default example;
 ```
 
-2) Register it in `src/scripts/sites/index.js`:
+2. Register it in `src/scripts/sites/index.js`:
 
 ```js
 const providers = [
-  { match: ['twitter.com', 'x.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/twitter.js')) },
-  { match: ['youtube.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/youtube.js')) },
+  {
+    match: ['twitter.com', 'x.com'],
+    loader: () => import(chrome.runtime.getURL('scripts/sites/twitter.js')),
+  },
+  {
+    match: ['youtube.com'],
+    loader: () => import(chrome.runtime.getURL('scripts/sites/youtube.js')),
+  },
   { match: ['reddit.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/reddit.js')) },
-  { match: ['example.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/example.js')) },
+  {
+    match: ['example.com'],
+    loader: () => import(chrome.runtime.getURL('scripts/sites/example.js')),
+  },
 ];
 ```
 
 Notes:
 
 - Wildcards are supported in `match` via patterns like `*.medium.com`.
-- Rebuild (`npm run build`) and reload the extension. Ensure the new domain appears under Enabled Domains on the Options page.
+- Rebuild (`npm run build`) and reload Tributary. Ensure the new domain appears under Enabled Domains on the Options page.
 - Update `manifest.json` if needed:
   - Add the domain to `host_permissions`
   - Add the match pattern to `content_scripts[0].matches`
 
-Reload the extension, enable the new domain in the Options page, and test.
+Reload Tributary, enable the new domain in the Options page, and test.
 
 ## Submitting changes
 

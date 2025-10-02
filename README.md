@@ -2,15 +2,15 @@
 
 ## Tributary: The Effortless Archive for Raindrop.io
 
-The internet is a torrent of information. Your social feeds are chaotic, fast-moving streams. But within that noise, you find gems---articles, ideas, and inspiration worth keeping. **Tributary** is the calm delta where appreciation meets preservation. It turns your simple 'like' or 'upvote' into a conscious act of curation, effortlessly channeling the best of the web into your personal library. It doesn't just save links; it honors your curiosity, one drop at a time.
+The internet is a torrent of information. Your social feeds are chaotic, fast-moving streams. But within that noise, you find gems – articles, ideas, and inspiration worth keeping. **Tributary** is the calm delta where appreciation meets preservation. It turns your simple 'like' or 'upvote' into a conscious act of curation, effortlessly channeling the best of the web into your personal library. It doesn't just save links; it honors your curiosity, one drop at a time.
 
 ### Features
 
-- **Instant Saves:** Tap Like or Upvote on Twitter/X, YouTube, or Reddit, and the extension quietly delivers the post's main link to Raindrop.io.
-- **Intelligent Link Detection:** The extension hunts for outbound links within a post and gracefully falls back to the canonical URL when no external links are available.
+- **Instant Saves:** Tap Like or Upvote on Twitter/X, YouTube, or Reddit, and Tributary quietly delivers the post's main link to Raindrop.io.
+- **Intelligent Link Detection:** Tributary hunts for outbound links within a post and gracefully falls back to the canonical URL when no external links are available.
 - **Friendly Confirmations:** Lightweight toast messages celebrate every success and surface issues before they slow you down.
 - **Personalized Defaults:** Set your go-to collection and tags once, and every bookmark will land in the perfect spot.
-- **Domain-Level Control:** Use the options page to pause or resume the extension on individual sites with no code edits required.
+- **Domain-Level Control:** Use the options page to pause or resume Tributary on individual sites with no code edits required.
 - **Built for Expansion:** Add support for more communities in minutes using modular site providers under `src/scripts/sites/` with a lightweight registry.
 
 ### Why Use This Extension?
@@ -41,8 +41,8 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
     Clone or download this repository, then open a terminal inside the project directory.
 
     ```bash
-    git clone https://github.com/<your-org>/<your-repo>.git
-    cd <your-repo>
+    git clone https://github.com/dsuriano/tributary.git
+    cd tributary
     ```
 
 2.  **Install Dependencies**
@@ -53,7 +53,7 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
     npm install
     ```
 
-3.  **Build the Extension**
+3.  **Build Tributary**
 
     Build the source into the `dist/` directory.
 
@@ -67,13 +67,13 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
     npm run dev
     ```
 
-4.  **Load the Extension in Chrome**
+4.  **Load Tributary in Chrome**
 
     a. Open Google Chrome and navigate to `chrome://extensions/`.
     b. Toggle **Developer mode** on in the top-right corner.
     c. Click **Load unpacked** and select the `dist/` directory from this project.
-    d. The extension will appear in your list. Pin it to the toolbar for easy access.
-    e. If you are running the `dev` watcher, click the **Refresh** button on the extension card in `chrome://extensions/` to load your changes.
+    d. Tributary will appear in your list. Pin it to the toolbar for easy access.
+    e. If you are running the `dev` watcher, click the **Refresh** button on Tributary card in `chrome://extensions/` to load your changes.
 
 ### Project Structure
 
@@ -117,28 +117,30 @@ tributary/
 
 > **Note**: Source files are located in the `src/` directory. Run `npm run build` to produce the bundled extension inside `dist/` before loading it into Chrome.
 
-### Permissions
+### Raindrop.io Permissions
 
-To allow the extension to create bookmarks, you need a **test token** from Raindrop.io:
+To allow Tributary to create bookmarks, you need a **test token** from Raindrop.io:
 
 1.  Log in to your Raindrop.io account.
-2.  Go to **Settings → Integrations** and locate the **API** section.
-3.  Click **Get test token** and copy the generated token. This token is used as a Bearer token in the `Authorization` header for every API call.
+2.  Go to **Settings → Integrations** and locate the **For Developers** section.
+3.  Click **Create new app** and name it "Tributary".
+4.  Click on your newly created app, then click the **Create Test Token** link, followed by **OK**.
+5.  Copy the test token to your clipboard and open Tributary's options page.
 
-Test tokens are scoped to your account and can be revoked at any time. Store it carefully; the extension only saves it locally using `chrome.storage.local`.
+Test tokens are scoped to your account and can be revoked at any time. Store it carefully; Tributary only saves it locally using `chrome.storage.local`.
 
-### Configuring the Extension
+### Configuring Tributary
 
-1.  Open the extension's options page.
+1.  Open Tributary's options page.
 2.  Paste your test token into the **API Token** field.
-3.  After saving, the extension will validate your token and fetch your collections. Select a default collection or leave it unset to use your Inbox.
-4.  Enter comma-separated default tags (e.g., `social, from-twitter`) if desired. These tags will be applied to every bookmark.
-5.  Use the checkboxes under **Enabled Domains** to turn the extension on or off for supported websites.
+3.  After saving, Tributary will validate your token and fetch your collections. Select a default collection or leave it unset to use your Inbox.
+4.  Enter comma-separated default tags (e.g., `social, tributary`) if desired. These tags will be applied to every bookmark.
+5.  Use the checkboxes under **Enabled Domains** to turn Tributary on or off for supported websites.
 6.  Click **Save settings** to persist your changes. Changes take effect immediately.
 
 When configured correctly, the status indicator will show **Connected** and your collection list will populate.
 
-### Using the Extension
+### Using Tributary
 
 - **On Twitter/X**, click the ❤️ **Like** button beneath a tweet.
 - **On YouTube**, click the 👍 **Like** button beneath a video.
@@ -245,7 +247,7 @@ const providers = [
 - Use stable attributes like `data-testid` or `aria-label` when possible.
 - Prefer returning stable permalinks in the `getPermalink` hook.
 - Keep hooks small and resilient to prevent errors from missing nodes.
-- Rebuild (`npm run build`) and reload the extension. Ensure the new domain shows up under Enabled Domains in the Options page (which reads from the registry) and is included in `manifest.json` `host_permissions`/`content_scripts.matches` if needed.
+- Rebuild (`npm run build`) and reload Tributary. Ensure the new domain shows up under Enabled Domains in the Options page (which reads from the registry) and is included in `manifest.json` `host_permissions`/`content_scripts.matches` if needed.
 
 #### Provider Template
 
@@ -282,7 +284,7 @@ const providers = [
 ### Known Limitations
 
 - **"Unlike" actions are ignored.** Only positive clicks (Like, Upvote) trigger bookmarking. This prevents accidental deletion from your Raindrop.io collection.
-- **Rate Limiting.** The Raindrop.io API limits requests. The extension applies a simple backoff if a 429 response is received, but rapid clicks may still result in temporary failures.
+- **Rate Limiting.** The Raindrop.io API limits requests. Tributary applies a simple backoff if a 429 response is received, but rapid clicks may still result in temporary failures.
 - **Link Extraction.** The algorithm picks the first external link it finds in a post. There is currently no way to choose which link is saved if a post contains multiple.
 
 ### Testing
@@ -326,7 +328,7 @@ Pull requests and suggestions are welcome. See `CONTRIBUTING.md` for development
 ### Debugging
 
 - Enable "Debug logging" in the Options page to get verbose logs from the service worker.
-- To view service worker logs, go to `chrome://extensions`, find the extension, and click the "Service worker" link.
+- To view service worker logs, go to `chrome://extensions`, find Tributary, and click the "Service worker" link.
 - For content script logs, open the browser's DevTools on the tab where you are testing.
 - Run tests with `npm test -- --verbose` for detailed output.
 
