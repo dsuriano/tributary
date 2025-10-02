@@ -27,6 +27,7 @@
     "@types/chrome": "^0.0.268",
     "@types/node": "^20.11.19",
     "@vitest/ui": "^3.2.4",
+    "@vitest/coverage-v8": "^3.2.4",
     "esbuild": "^0.25.10",
     "jsdom": "^27.0.0",
     "rimraf": "^5.0.7",
