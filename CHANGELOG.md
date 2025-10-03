@@ -19,16 +19,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet.
 
-## [1.0.0] - 2025-10-01
+## [1.0.0] - 2025-10-03
 
 ### Added
 
-- Initial release of the Tributary Chrome extension for Raindrop.io.
-- One-click saves triggered by likes or upvotes on Twitter/X, YouTube, and Reddit.
-- Intelligent outbound link detection with canonical URL fallback.
-- Toast-based success and error feedback for background saves.
-- Options page for managing API tokens, default collections, tags, and per-domain enablement.
-- Modular site provider registry under `src/scripts/sites/` for rapid expansion to new platforms.
-- Background service worker integration with the Raindrop.io API, including rate-limit backoff.
-- Comprehensive tooling: TypeScript, esbuild bundler, Vitest unit tests, and Playwright end-to-end tests.
+- Initial release of the Tributary Chrome extension for Raindrop.io with Manifest V3 support.
+- One-click bookmarking triggered by likes or upvotes on Twitter/X, YouTube, and Reddit.
+- Automatic outbound link detection with canonical URL fallback to ensure reliable saves.
+- Toast notifications surfacing success and error feedback for every background save.
+- Options page for managing Raindrop API tokens, default collections, tags, per-domain enablement, and debug logging.
+- Modular site provider registry under `src/scripts/sites/` with type-safe contracts for rapid expansion to new platforms.
+- Background service worker integration with Raindrop.io, including token validation and rate-limit backoff handling.
+- Promise-based storage helpers around `chrome.storage` exposed in `src/config/storage.ts`.
+- Tooling stack with TypeScript, esbuild bundler, Vitest unit/integration tests, and Playwright end-to-end suites.
 - GitHub Actions workflow for automated packaging and release artifacts.
+
+### Documentation
+
+- Authored README, CONTRIBUTING, and TESTING guides covering setup, development workflow, and debugging practices.
+
+[Unreleased]: https://github.com/dsuriano/tributary/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/dsuriano/tributary/releases/tag/v1.0.0
