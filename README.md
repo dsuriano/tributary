@@ -30,13 +30,19 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
 
 - **TypeScript 5.3+** - 100% type-safe codebase with strict mode enabled
 - **esbuild** - Fast bundler with TypeScript support
-- **Vitest** - Unit and integration testing
 - **Playwright** - End-to-end browser testing
 - **Chrome Extension Manifest V3** - Modern extension architecture
 
 ## Setup and Installation
 
-1.  **Clone the Repository**
+1.  **Download the Latest Release**
+
+    Grab the packaged build from the [Tributary releases page](https://github.com/dsuriano/tributary/releases/latest) and download the `tributary-extension.zip` asset.
+
+    - Extract the archive somewhere convenient.
+    - Skip ahead to [Load Tributary in Chrome](#load-tributary-in-chrome) to install without building from source.
+
+2.  **Clone the Repository** *(optional for development)*
 
     Clone or download this repository, then open a terminal inside the project directory.
 
@@ -45,7 +51,7 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
     cd tributary
     ```
 
-2.  **Install Dependencies**
+3.  **Install Dependencies**
 
     Install the necessary Node.js dependencies.
 
@@ -53,7 +59,7 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
     npm install
     ```
 
-3.  **Build Tributary**
+4.  **Build Tributary**
 
     Build the source into the `dist/` directory.
 
