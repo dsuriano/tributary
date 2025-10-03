@@ -42,7 +42,7 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
     - Extract the archive somewhere convenient.
     - Skip ahead to [Load Tributary in Chrome](#load-tributary-in-chrome) to install without building from source.
 
-2.  **Clone the Repository** *(optional for development)*
+2.  **Clone the Repository** _(optional for development)_
 
     Clone or download this repository, then open a terminal inside the project directory.
 
@@ -77,7 +77,9 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
 
 - Open Google Chrome and navigate to `chrome://extensions/`.
 - Toggle **Developer mode** on in the top-right corner.
-- Click **Load unpacked** and select the `dist/` directory from this project.
+- Click **Load unpacked** and choose the folder that matches how you obtained Tributary:
+  - If you downloaded `tributary-extension.zip`, select the extracted release folder.
+  - If you built from source, select the locally generated `dist/` directory.
 - Tributary will appear in your list. Pin it to the toolbar for easy access.
 - If you are running the `dev` watcher, click the **Refresh** button on the Tributary card in `chrome://extensions/` to load your changes.
 
