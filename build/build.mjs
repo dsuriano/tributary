@@ -76,6 +76,7 @@ async function run({ watch = false } = {}) {
       'scripts/sites/twitter': 'src/scripts/sites/twitter.ts',
       'scripts/sites/youtube': 'src/scripts/sites/youtube.ts',
       'scripts/sites/reddit': 'src/scripts/sites/reddit.ts',
+      'scripts/sites/github': 'src/scripts/sites/github.ts',
       'scripts/sites/generic': 'src/scripts/sites/generic.ts',
       'options/options': 'src/options/options.ts'
     },

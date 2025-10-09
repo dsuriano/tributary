@@ -179,3 +179,60 @@ export function waitFor(condition, { timeout = 1000, interval = 50 } = {}) {
 export function setToggleState(element, pressed) {
   element.setAttribute('aria-pressed', String(pressed));
 }
+
+/**
+ * Create a mock GitHub repository page
+ * Mimics the actual GitHub DOM structure with realistic attributes
+ */
+export function createGitHubRepo({ owner = 'testuser', repo = 'testrepo', description = 'Test repository description', isStarred = false, starCount = 1200 } = {}) {
+  const container = document.createElement('div');
+
+  // Repository header
+  const header = document.createElement('h1');
+  
+  const ownerLink = document.createElement('a');
+  ownerLink.setAttribute('data-hovercard-type', 'user');
+  ownerLink.textContent = owner;
+  ownerLink.href = `/${owner}`;
+  header.appendChild(ownerLink);
+
+  header.appendChild(document.createTextNode(' / '));
+
+  const repoStrong = document.createElement('strong');
+  const repoLink = document.createElement('a');
+  repoLink.textContent = repo;
+  repoLink.href = `/${owner}/${repo}`;
+  repoStrong.appendChild(repoLink);
+  header.appendChild(repoStrong);
+
+  container.appendChild(header);
+
+  // Repository description
+  if (description) {
+    const descEl = document.createElement('p');
+    descEl.textContent = description;
+    container.appendChild(descEl);
+  }
+
+  // Star button - matches actual GitHub structure
+  const starButton = document.createElement('button');
+  
+  // GitHub uses "Star this repository" / "Unstar this repository" in aria-label
+  // but shows "Star" / "Starred" as button text
+  const ariaLabel = isStarred 
+    ? `Unstar this repository (${starCount})` 
+    : `Star this repository (${starCount})`;
+  const buttonText = isStarred ? 'Starred' : 'Star';
+  
+  starButton.setAttribute('aria-label', ariaLabel);
+  starButton.setAttribute('data-aria-prefix', isStarred ? 'Unstar this repository' : 'Star this repository');
+  starButton.setAttribute('data-hydro-click', JSON.stringify({
+    event_type: 'repository.click',
+    payload: { target: 'STAR_BUTTON' }
+  }));
+  starButton.textContent = buttonText;
+  
+  container.appendChild(starButton);
+
+  return container;
+}
