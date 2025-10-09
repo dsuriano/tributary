@@ -65,6 +65,8 @@ const github: SiteConfig = {
         || document.querySelector('strong[itemprop="name"] a')
         || document.querySelector('h1 a[href*="/"]');
       
+      let repoTitle = '';
+      
       if (repoHeader?.textContent) {
         const repoName = repoHeader.textContent.trim();
         
@@ -75,25 +77,49 @@ const github: SiteConfig = {
         
         if (ownerLink?.textContent && ownerLink !== repoHeader) {
           const ownerName = ownerLink.textContent.trim();
-          return `${ownerName}/${repoName}`;
+          repoTitle = `${ownerName}/${repoName}`;
+        } else {
+          repoTitle = repoName;
         }
-        
-        return repoName;
+      } else {
+        // Fallback: parse from document title (format: "owner/repo: description")
+        const title = document.title || '';
+        const match = title.match(/^([^:]+)/);
+        repoTitle = (match && match[1]) ? match[1].trim() : title;
       }
       
-      // Fallback: parse from document title (format: "owner/repo: description")
-      const title = document.title || '';
-      const match = title.match(/^([^:]+)/);
-      return (match && match[1]) ? match[1].trim() : title;
+      // Add description to the title
+      const descriptionEl = document.querySelector('p.f4.my-3');
+      if (descriptionEl?.textContent) {
+        const description = descriptionEl.textContent.trim();
+        if (description) {
+          return `${repoTitle} - ${description}`;
+        }
+      }
+      
+      return repoTitle;
     },
     
     getExcerpt: (): string => {
-      // Extract repository description
-      // GitHub typically shows the description in the first paragraph element
-      const paragraphs = Array.from(document.querySelectorAll('p'));
-      for (const p of paragraphs) {
-        const text = (p.textContent || '').trim();
+      // Extract the entire About section content
+      // The About section is in a div with class "BorderGrid-cell" 
+      const aboutSection = document.querySelector('div.BorderGrid-cell');
+      if (aboutSection?.textContent) {
+        const text = aboutSection.textContent
+          .trim()
+          .replace(/\s+/g, ' ') // Normalize whitespace
+          .replace(/\n+/g, ' '); // Remove newlines
+        
         if (text && text.length > 10) {
+          return text.slice(0, 1000); // Increased to 1000 chars to capture more details
+        }
+      }
+      
+      // Fallback: just get the description paragraph
+      const descriptionEl = document.querySelector('p.f4.my-3');
+      if (descriptionEl?.textContent) {
+        const text = descriptionEl.textContent.trim();
+        if (text) {
           return text.slice(0, 500);
         }
       }
@@ -102,12 +128,6 @@ const github: SiteConfig = {
       const metaDesc = document.querySelector('meta[name="description"]');
       if (metaDesc instanceof HTMLMetaElement && metaDesc.content) {
         return metaDesc.content.trim().slice(0, 500);
-      }
-      
-      // Last resort: use README preview if visible
-      const readme = document.querySelector('article[itemprop="text"]');
-      if (readme?.textContent) {
-        return readme.textContent.trim().slice(0, 500);
       }
       
       return '';

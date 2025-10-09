@@ -207,11 +207,17 @@ export function createGitHubRepo({ owner = 'testuser', repo = 'testrepo', descri
 
   container.appendChild(header);
 
-  // Repository description
+  // About section - matches GitHub's actual structure
   if (description) {
+    const aboutSection = document.createElement('div');
+    aboutSection.className = 'BorderGrid-cell';
+    
     const descEl = document.createElement('p');
+    descEl.className = 'f4 my-3';
     descEl.textContent = description;
-    container.appendChild(descEl);
+    aboutSection.appendChild(descEl);
+    
+    container.appendChild(aboutSection);
   }
 
   // Star button - matches actual GitHub structure

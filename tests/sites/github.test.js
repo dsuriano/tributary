@@ -201,10 +201,26 @@ describe('GitHub Provider', () => {
   });
 
   describe('getTitle', () => {
-    test('should extract owner/repo as title', () => {
+    test('should extract owner/repo with description as title', () => {
+      const description = 'A declarative, efficient, and flexible JavaScript library for building user interfaces.';
       const repo = createGitHubRepo({
         owner: 'facebook',
-        repo: 'react'
+        repo: 'react',
+        description
+      });
+      document.body.appendChild(repo);
+
+      const button = document.querySelector('button[aria-label*="Star"]');
+      const title = github.hooks.getTitle(button);
+
+      expect(title).toBe(`facebook/react - ${description}`);
+    });
+
+    test('should extract owner/repo without description if none exists', () => {
+      const repo = createGitHubRepo({
+        owner: 'facebook',
+        repo: 'react',
+        description: ''
       });
       document.body.appendChild(repo);
 
@@ -214,7 +230,7 @@ describe('GitHub Provider', () => {
       expect(title).toBe('facebook/react');
     });
 
-    test('should extract just repo name if owner not found', () => {
+    test('should extract just repo name with description if owner not found', () => {
       const container = document.createElement('div');
       const header = document.createElement('h1');
       const strong = document.createElement('strong');
@@ -224,6 +240,15 @@ describe('GitHub Provider', () => {
       header.appendChild(strong);
       container.appendChild(header);
 
+      // Add description
+      const aboutSection = document.createElement('div');
+      aboutSection.className = 'BorderGrid-cell';
+      const desc = document.createElement('p');
+      desc.className = 'f4 my-3';
+      desc.textContent = 'A JavaScript library';
+      aboutSection.appendChild(desc);
+      container.appendChild(aboutSection);
+
       const button = document.createElement('button');
       button.setAttribute('aria-label', 'Star this repository');
       container.appendChild(button);
@@ -231,7 +256,7 @@ describe('GitHub Provider', () => {
       document.body.appendChild(container);
 
       const title = github.hooks.getTitle(button);
-      expect(title).toBe('react');
+      expect(title).toBe('react - A JavaScript library');
     });
 
     test('should fallback to document.title', () => {
@@ -246,7 +271,7 @@ describe('GitHub Provider', () => {
   });
 
   describe('getExcerpt', () => {
-    test('should extract repository description', () => {
+    test('should extract About section content', () => {
       const description = 'A declarative, efficient, and flexible JavaScript library for building user interfaces.';
       const repo = createGitHubRepo({
         owner: 'facebook',
@@ -258,11 +283,12 @@ describe('GitHub Provider', () => {
       const button = document.querySelector('button[aria-label*="Star"]');
       const excerpt = github.hooks.getExcerpt(button);
 
-      expect(excerpt).toBe(description);
+      // Should contain the description (whitespace normalized)
+      expect(excerpt).toContain(description);
     });
 
-    test('should limit excerpt to 500 characters', () => {
-      const longDescription = 'a'.repeat(1000);
+    test('should limit excerpt to 1000 characters', () => {
+      const longDescription = 'a'.repeat(2000);
       const repo = createGitHubRepo({
         description: longDescription
       });
@@ -271,10 +297,10 @@ describe('GitHub Provider', () => {
       const button = document.querySelector('button[aria-label*="Star"]');
       const excerpt = github.hooks.getExcerpt(button);
 
-      expect(excerpt.length).toBe(500);
+      expect(excerpt.length).toBe(1000);
     });
 
-    test('should return empty string if no description found', () => {
+    test('should return empty string if no About section found', () => {
       const repo = createGitHubRepo({
         description: ''
       });
