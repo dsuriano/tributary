@@ -40,7 +40,7 @@
     "forceConsistentCasingInFileNames": true,
     
     // Chrome extension types
-    "types": ["chrome", "jest", "node"]
+    "types": ["chrome", "node"]
   },
   "include": [
     "src/**/*"
