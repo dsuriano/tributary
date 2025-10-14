@@ -6,7 +6,7 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
 
 ### Features
 
-- **Instant Saves:** Tap Like or Upvote on Twitter/X, YouTube, or Reddit, and Tributary quietly delivers the post's main link to Raindrop.io.
+- **Instant Saves:** Tap Like or Upvote on Twitter/X, YouTube, Reddit, or star a repository on GitHub, and Tributary quietly delivers the primary link to Raindrop.io.
 - **Intelligent Link Detection:** Tributary hunts for outbound links within a post and gracefully falls back to the canonical URL when no external links are available.
 - **Friendly Confirmations:** Lightweight toast messages celebrate every success and surface issues before they slow you down.
 - **Personalized Defaults:** Set your go-to collection and tags once, and every bookmark will land in the perfect spot.
@@ -17,7 +17,7 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
 
 - **Save Content Instantly:** Capture links the moment you react to them, eliminating the need for extra clicks or to copy and paste URLs into Raindrop.io later.
 - **Keep Collections Curated:** Automatically apply your preferred collection and tag defaults so everything lands exactly where you expect it.
-- **Works with Major Platforms:** Ships with first-class support for Twitter/X, YouTube, and Reddit, and is easily extensible for more sites.
+- **Works with Major Platforms:** Ships with first-class support for Twitter/X, YouTube, Reddit, and GitHub, and is easily extensible for more sites.
 - **Respectful by Design:** Stores tokens only in `chrome.storage.local`, offers visible toast feedback, and lets you disable individual domains when you need a quieter feed experience.
 
 ### Requirements
@@ -107,6 +107,7 @@ tributary/
 │        ├─ twitter.ts          # Twitter/X provider
 │        ├─ youtube.ts          # YouTube provider
 │        ├─ reddit.ts           # Reddit provider
+│        ├─ github.ts           # GitHub provider (stars -> Raindrop)
 │        └─ generic.ts          # Fallback provider
 ├─ tests/                       # Test suite (Vitest + Playwright)
 │  ├─ sites/                    # Site provider tests
@@ -153,6 +154,7 @@ When configured correctly, the status indicator will show **Connected** and your
 - **On Twitter/X**, click the ❤️ **Like** button beneath a tweet.
 - **On YouTube**, click the 👍 **Like** button beneath a video.
 - **On Reddit**, click the ⬆️ **Upvote** button on a post.
+- **On GitHub**, click the ⭐ **Star** button on a repository you want to bookmark.
 
 A toast message will appear briefly confirming that the bookmark was saved. If the API token is invalid or the Raindrop.io API returns an error (including 429 rate limits), the toast will display an error message.
 
@@ -175,8 +177,8 @@ Each site provider can also expose hook functions to customize behavior. See `sr
 
 - **`hooks.toggledOnAfterClick(button, ctx)`** Returns `true` only when a click toggles the positive state (e.g., the like button is now "on"). Return `false` to explicitly cancel a save, or `undefined` to fall back to the generic detector.
 - **`hooks.getPermalink(button, ctx)`** Returns a canonical permalink.
-- **`hooks.getTitle(button, ctx)`** Overrides the page title.
-- **`hooks.getExcerpt(button, ctx)`** Overrides the summary excerpt.
+- **`hooks.getTitle(button, ctx)`** Overrides the page title (e.g., GitHub provider adds repo description to the title).
+- **`hooks.getExcerpt(button, ctx)`** Overrides the summary excerpt (e.g., GitHub provider captures the About panel details).
 - **`hooks.handleUnmatchedClick(event, ctx)`** Optional. Invoked when the primary selectors miss the target (useful for post-click scans or pointer heuristics).
 - **`hooks.onInit(ctx)`** Optional. Run once after listeners are attached; ideal for wiring MutationObservers or shadow-root listeners.
 
