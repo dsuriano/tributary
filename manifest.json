@@ -16,6 +16,7 @@
     "*://*.x.com/*",
     "*://*.youtube.com/*",
     "*://*.reddit.com/*",
+    "*://*.github.com/*",
     "https://api.raindrop.io/*"
   ],
   "content_scripts": [
@@ -24,7 +25,8 @@
         "*://*.twitter.com/*",
         "*://*.x.com/*",
         "*://*.youtube.com/*",
-        "*://*.reddit.com/*"
+        "*://*.reddit.com/*",
+        "*://*.github.com/*"
       ],
       "js": ["scripts/content_script.js"],
       "run_at": "document_idle",

@@ -42,6 +42,7 @@ const providers: ProviderEntry[] = [
   { match: ['twitter.com', 'x.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/twitter.js')) },
   { match: ['youtube.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/youtube.js')) },
   { match: ['reddit.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/reddit.js')) },
+  { match: ['github.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/github.js')) },
 ];
 
 const genericLoader = () => import(chrome.runtime.getURL('scripts/sites/generic.js'));

@@ -19,6 +19,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet.
 
+## [1.1.0] - 2025-10-14
+
+### Added
+
+- GitHub integration that saves repositories to Raindrop.io whenever you star them, including logic to distinguish star vs. unstar actions.
+- Enriched bookmark metadata for GitHub stars: titles now append the repository description and excerpts capture the entire About panel content.
+- Automated tests and DOM helpers covering the GitHub provider selectors, toggle detection, permalink, title, and excerpt extraction.
+
+### Changed
+
+- Updated README to document GitHub support across features, usage instructions, and provider hooks.
+- Added the GitHub provider to the documented project structure for quick discovery.
+
+### Fixed
+
+- None.
+
 ## [1.0.0] - 2025-10-03
 
 ### Added
@@ -38,5 +55,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Authored README, CONTRIBUTING, and TESTING guides covering setup, development workflow, and debugging practices.
 
-[Unreleased]: https://github.com/dsuriano/tributary/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/dsuriano/tributary/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/dsuriano/tributary/releases/tag/v1.1.0
 [1.0.0]: https://github.com/dsuriano/tributary/releases/tag/v1.0.0
