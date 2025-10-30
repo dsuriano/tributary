@@ -8,9 +8,12 @@ const __dirname = path.dirname(__filename);
 /**
  * Custom fixture that loads Tributary
  */
+const getTargetDir = () => process.env.EXTENSION_TARGET?.trim() || 'chrome';
+
 export const test = base.extend({
   context: async ({}, use) => {
-    const pathToExtension = path.join(__dirname, '../../dist');
+    const target = getTargetDir();
+    const pathToExtension = path.join(__dirname, `../../dist/${target}`);
     const context = await chromium.launchPersistentContext('', {
       headless: false, // Extensions require headed mode
       args: [

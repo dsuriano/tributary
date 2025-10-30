@@ -1,3 +1,4 @@
+import browser from 'webextension-polyfill';
 import { TIMING, STORAGE_KEYS } from '../config/constants.js';
 import { getFromStorage } from '../config/storage.js';
 import type { SiteConfig, HookContext } from './sites/types.js';
@@ -91,7 +92,7 @@ interface StorageData {
    */
   async function loadConfig(): Promise<SiteConfig | null> {
     const host = (window.location.hostname || '').replace(/^www\./, '');
-    const module = await import(chrome.runtime.getURL('scripts/sites/index.js'));
+    const module = await import(browser.runtime.getURL('scripts/sites/index.js'));
     const loader = module.loadSiteConfigFor || module.default?.loadSiteConfigFor;
     if (typeof loader === 'function') {
       return await loader(host);
@@ -653,7 +654,7 @@ interface StorageData {
     
     if (DEBUG) console.debug('[Tributary] Saving', { url, titleLen: (title||'').length, excerptLen: (excerpt||'').length });
     
-    if (!chrome?.runtime?.id) {
+    if (!browser?.runtime?.id) {
       if (DEBUG) console.warn('[Tributary] runtime context missing; skipping save');
       recentUrlsTS.delete(url);
       showToast('Extension restarted. Reload the page to continue.', false, { reuseActive: true });
@@ -661,7 +662,7 @@ interface StorageData {
     }
     
     try {
-      await chrome.runtime.sendMessage({
+      await browser.runtime.sendMessage({
         action: 'save',
         data: {
           url,
@@ -789,7 +790,7 @@ interface StorageData {
     }
 
     // Listen for responses from the background
-    chrome.runtime.onMessage.addListener((message: SaveResultMessage) => {
+    browser.runtime.onMessage.addListener((message: SaveResultMessage) => {
       if (message && message.type === 'saveResult') {
         if (message.status === 'success') {
           showToast('Saved to Raindrop.io!', true, { reuseActive: true });

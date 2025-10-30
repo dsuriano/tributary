@@ -4,8 +4,10 @@
   "description": "Tributary: The effortless archive for Raindrop.io.",
   "type": "module",
   "scripts": {
-    "build": "npm run clean && node build/build.mjs",
+    "build": "npm run clean && node build/build.mjs --target=chrome && node build/build.mjs --target=firefox",
     "dev": "node build/build.mjs --watch",
+    "build:chrome": "npm run clean && node build/build.mjs --target=chrome",
+    "build:firefox": "npm run clean && node build/build.mjs --target=firefox",
     "clean": "rimraf dist",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -33,5 +35,8 @@
     "rimraf": "^5.0.7",
     "typescript": "^5.3.3",
     "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "webextension-polyfill": "^0.10.0"
   }
 }

@@ -6,6 +6,7 @@
  * domains. It communicates with the background service worker to
  * validate the token and fetch available collections.
  */
+import browser from 'webextension-polyfill';
 
 interface StoredSettings {
   raindropToken?: string;
@@ -42,7 +43,7 @@ interface CollectionsResponse {
  * the list of domains in the options page.
  */
 async function loadSupportedDomains(): Promise<string[]> {
-  const mod = await import(chrome.runtime.getURL('scripts/sites/index.js'));
+  const mod = await import(browser.runtime.getURL('scripts/sites/index.js'));
   const getSupportedDomains = mod.getSupportedDomains || mod.default?.getSupportedDomains;
   if (typeof getSupportedDomains === 'function') {
     return getSupportedDomains();
@@ -57,12 +58,13 @@ async function loadSupportedDomains(): Promise<string[]> {
  */
 async function init(): Promise<void> {
   // Get stored settings
-  const stored = await new Promise<StoredSettings>((resolve) => {
-    chrome.storage.local.get(
-      ['raindropToken', 'defaultCollection', 'defaultTags', 'enabledDomains', 'debugLogging'],
-      (result) => resolve(result as StoredSettings)
-    );
-  });
+  const stored = await browser.storage.local.get([
+    'raindropToken',
+    'defaultCollection',
+    'defaultTags',
+    'enabledDomains',
+    'debugLogging'
+  ]) as StoredSettings;
   
   const tokenInput = document.getElementById('token') as HTMLInputElement;
   const tokenStatus = document.getElementById('token-status') as HTMLElement;
@@ -168,24 +170,23 @@ async function init(): Promise<void> {
   saveButton.addEventListener('click', async () => {
     const currentState = getCurrentState();
     // Persist settings
-    chrome.storage.local.set({
+    await browser.storage.local.set({
       raindropToken: currentState.token,
       defaultCollection: currentState.defaultCollection,
       defaultTags: currentState.tags,
       enabledDomains: currentState.enabledDomains,
       debugLogging: currentState.debugLogging
-    }, () => {
-      // After saving, validate token and update collections
-      if (currentState.token) {
-        tokenStatus.textContent = 'Connecting…';
-        updateCollections(currentState.token, collectionSelect, tokenStatus, currentState.defaultCollection, setInitialState);
-      } else {
-        tokenStatus.textContent = 'Not connected';
-        // Clear collection select
-        collectionSelect.innerHTML = '<option value="">-- select collection --</option>';
-        setInitialState();
-      }
     });
+    // After saving, validate token and update collections
+    if (currentState.token) {
+      tokenStatus.textContent = 'Connecting…';
+      updateCollections(currentState.token, collectionSelect, tokenStatus, currentState.defaultCollection, setInitialState);
+    } else {
+      tokenStatus.textContent = 'Not connected';
+      // Clear collection select
+      collectionSelect.innerHTML = '<option value="">-- select collection --</option>';
+      setInitialState();
+    }
   });
 }
 
@@ -200,29 +201,24 @@ function updateCollections(
   currentSelection: number | null | undefined,
   onComplete?: () => void
 ): void {
-  chrome.runtime.sendMessage({ action: 'validateToken' }, (validateRes: ValidationResponse) => {
-    if (!validateRes || !validateRes.valid) {
-      statusEl.textContent = 'Invalid token';
-      select.innerHTML = '<option value="">-- select collection --</option>';
-      if (onComplete) {
-        onComplete();
+  (async () => {
+    try {
+      const validateRes = await browser.runtime.sendMessage({ action: 'validateToken' }) as ValidationResponse;
+      if (!validateRes || !validateRes.valid) {
+        statusEl.textContent = 'Invalid token';
+        select.innerHTML = '<option value="">-- select collection --</option>';
+        if (onComplete) onComplete();
+        return;
       }
-      return;
-    }
-    // Token valid: fetch collections
-    chrome.runtime.sendMessage({ action: 'getCollections' }, (res: CollectionsResponse) => {
+      const res = await browser.runtime.sendMessage({ action: 'getCollections' }) as CollectionsResponse;
       if (!res || res.error) {
         statusEl.textContent = 'Error fetching collections';
         select.innerHTML = '<option value="">-- select collection --</option>';
-        if (onComplete) {
-          onComplete();
-        }
+        if (onComplete) onComplete();
         return;
       }
       const collections = res.collections || [];
-      // Sort collections alphabetically by title
       collections.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-      // Build options
       select.innerHTML = '<option value="">-- select collection --</option>';
       collections.forEach((col) => {
         const opt = document.createElement('option');
@@ -234,11 +230,13 @@ function updateCollections(
         select.appendChild(opt);
       });
       statusEl.textContent = 'Connected';
-      if (onComplete) {
-        onComplete();
-      }
-    });
-  });
+      if (onComplete) onComplete();
+    } catch (err) {
+      statusEl.textContent = 'Error fetching collections';
+      select.innerHTML = '<option value="">-- select collection --</option>';
+      if (onComplete) onComplete();
+    }
+  })();
 }
 
 // Initialise when DOM content is ready

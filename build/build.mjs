@@ -1,5 +1,5 @@
 import { build, context as createContext } from 'esbuild';
-import { mkdir, rm, writeFile, copyFile, readFile, readdir } from 'node:fs/promises';
+import { mkdir, rm, writeFile, copyFile, readFile, readdir, access } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -7,7 +7,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const rootDir = join(__dirname, '..');
-const outdir = join(rootDir, 'dist');
+const target = (process.argv.find((a) => a.startsWith('--target=')) || '').split('=')[1] || 'chrome';
+const outBase = join(rootDir, 'dist');
+const outdir = join(outBase, target);
 
 async function copyDirectory(src, dest) {
   const entries = await readdir(src, { withFileTypes: true });
@@ -45,7 +47,49 @@ async function copyPublicAssets() {
   const assetsDest = join(outdir, 'assets');
   await copyDirectory(assetsSrc, assetsDest);
 
-  const manifestJson = JSON.parse(await readFile(join(rootDir, 'manifest.json'), 'utf-8'));
+  // Copy webextension polyfill to root of outdir
+  const polyfillSrc = join(rootDir, 'node_modules', 'webextension-polyfill', 'dist', 'browser-polyfill.js');
+  try {
+    await access(polyfillSrc);
+    await copyFile(polyfillSrc, join(outdir, 'browser-polyfill.js'));
+  } catch (e) {
+    console.warn('Polyfill not found at', polyfillSrc, '— ensure dependencies are installed.');
+  }
+
+  // Transform manifest per target
+  const manifestPath = join(rootDir, 'manifest.json');
+  const manifestJson = JSON.parse(await readFile(manifestPath, 'utf-8'));
+
+  // Ensure polyfill is loaded first in content scripts
+  if (Array.isArray(manifestJson.content_scripts)) {
+    manifestJson.content_scripts = manifestJson.content_scripts.map((cs) => {
+      const jsList = Array.isArray(cs.js) ? cs.js : [];
+      const withPolyfill = ['browser-polyfill.js', ...jsList.filter((p) => p !== 'browser-polyfill.js')];
+      return { ...cs, js: withPolyfill };
+    });
+  }
+
+  if (target === 'firefox') {
+    // Use background.scripts with module type; add gecko settings
+    manifestJson.background = {
+      scripts: ['browser-polyfill.js', 'scripts/background.js'],
+      type: 'module'
+    };
+    manifestJson.browser_specific_settings = manifestJson.browser_specific_settings || {};
+    manifestJson.browser_specific_settings.gecko = {
+      id: manifestJson?.browser_specific_settings?.gecko?.id || 'tributary@local',
+      strict_min_version: '121.0'
+    };
+  } else {
+    // Chrome: keep service_worker; ensure type module remains
+    if (!manifestJson.background || !manifestJson.background.service_worker) {
+      manifestJson.background = {
+        service_worker: 'scripts/background.js',
+        type: 'module'
+      };
+    }
+  }
+
   await writeFile(join(outdir, 'manifest.json'), JSON.stringify(manifestJson, null, 2));
 }
 

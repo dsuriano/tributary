@@ -22,7 +22,7 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
 
 ### Requirements
 
-- Google Chrome 110+ (or any Chromium-based browser that supports Manifest V3 and `chrome://extensions` developer mode).
+- Google Chrome 110+ **or** Firefox 121+ (any Chromium or Gecko browser that supports Manifest V3 / WebExtension APIs with developer mode).
 - Node.js 20+ and npm 10+ to run the build tooling.
 - A Raindrop.io account with access to generate a test token.
 
@@ -61,7 +61,7 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
 
 4.  **Build Tributary**
 
-    Build the source into the `dist/` directory.
+    Build the source into the `dist/` directory. The default build produces both Chrome and Firefox bundles under `dist/chrome/` and `dist/firefox/`.
 
     ```bash
     npm run build
@@ -73,15 +73,29 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
     npm run dev
     ```
 
+    The watcher emits Chrome output by default. To watch Firefox-specific bundles, run:
+
+    ```bash
+    node build/build.mjs --target=firefox --watch
+    ```
+
 ### Load Tributary in Chrome
 
 - Open Google Chrome and navigate to `chrome://extensions/`.
 - Toggle **Developer mode** on in the top-right corner.
 - Click **Load unpacked** and choose the folder that matches how you obtained Tributary:
   - If you downloaded `tributary-extension.zip`, select the extracted release folder.
-  - If you built from source, select the locally generated `dist/` directory.
+  - If you built from source, select the locally generated `dist/chrome/` directory.
 - Tributary will appear in your list. Pin it to the toolbar for easy access.
 - If you are running the `dev` watcher, click the **Refresh** button on the Tributary card in `chrome://extensions/` to load your changes.
+
+### Load Tributary in Firefox
+
+- Open Firefox and navigate to `about:debugging#/runtime/this-firefox`.
+- Click **Load Temporary Add-on…** and select the `manifest.json` file inside the folder that matches how you obtained Tributary:
+  - If you downloaded `tributary-extension.zip`, extract it and pick the `manifest.json` within the Firefox build folder.
+  - If you built from source, select `dist/firefox/manifest.json`.
+- Firefox will list Tributary under Temporary Extensions. Use **Reload** to pick up rebuilt assets when developing.
 
 ### Project Structure
 

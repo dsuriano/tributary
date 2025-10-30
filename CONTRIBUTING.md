@@ -9,11 +9,14 @@ Thanks for your interest in contributing! This project uses an esbuild-based wor
   - `npm install`
 - Start the dev watcher (rebuilds on change):
   - `npm run dev`
-- Load Tributary unpacked:
+- Load Tributary unpacked in Chrome:
   - Open `chrome://extensions`
   - Enable Developer Mode
-  - Click "Load unpacked" and select the `dist/` directory (built output)
-- During development, after changes rebuild, click the Refresh icon on Tributary card in `chrome://extensions`.
+  - Click "Load unpacked" and select the `dist/chrome/` directory (built output)
+- Load Tributary temporarily in Firefox:
+  - Open `about:debugging#/runtime/this-firefox`
+  - Click "Load Temporary Add-on…" and choose `dist/firefox/manifest.json`
+- During development, after changes rebuild, use Refresh/Reload in the respective browser tooling to pick up updates.
 
 ## Code style
 

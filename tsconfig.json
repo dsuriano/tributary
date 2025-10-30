@@ -39,7 +39,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     
-    // Chrome extension types
+    // Extension types
     "types": ["chrome", "node"]
   },
   "include": [
