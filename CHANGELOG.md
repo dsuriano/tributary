@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Nothing yet.
+
+## [1.2.0] - 2025-11-02
+
 ### Added
 
 - Firefox build target with manifest transforms to support temporary add-ons and Gecko-specific background scripts.
@@ -56,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Authored README, CONTRIBUTING, and TESTING guides covering setup, development workflow, and debugging practices.
 
-[Unreleased]: https://github.com/dsuriano/tributary/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/dsuriano/tributary/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/dsuriano/tributary/releases/tag/v1.2.0
 [1.1.0]: https://github.com/dsuriano/tributary/releases/tag/v1.1.0
 [1.0.0]: https://github.com/dsuriano/tributary/releases/tag/v1.0.0
