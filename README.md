@@ -96,7 +96,7 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
 
 - Open Firefox and navigate to `about:debugging#/runtime/this-firefox`.
 - Click **Load Temporary Add-on…** and select the `manifest.json` file inside the folder that matches how you obtained Tributary:
-  - If you downloaded `tributary-firefox.zip`, extract it and pick the `manifest.json` within the Firefox build folder.
+  - If you downloaded `tributary-firefox.zip`, extract it and select the `manifest.json` file at the root of the extracted folder.
   - If you built from source, select `dist/firefox/manifest.json`.
 - Firefox will list Tributary under Temporary Extensions. Use **Reload** to pick up rebuilt assets when developing.
 
