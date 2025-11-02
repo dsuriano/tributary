@@ -77,7 +77,7 @@ async function copyPublicAssets() {
     };
     manifestJson.browser_specific_settings = manifestJson.browser_specific_settings || {};
     manifestJson.browser_specific_settings.gecko = {
-      id: manifestJson?.browser_specific_settings?.gecko?.id || 'tributary@local',
+      id: process.env.EXTENSION_GECKO_ID || manifestJson?.browser_specific_settings?.gecko?.id || 'tributary@tributary.click',
       strict_min_version: '121.0'
     };
   } else {

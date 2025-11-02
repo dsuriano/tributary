@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nothing yet.
 
+## [1.2.1] - 2025-11-02
+
+### Changed
+
+- Firefox: set default `browser_specific_settings.gecko.id` to `tributary@tributary.click` and allow override via `EXTENSION_GECKO_ID`.
+
 ## [1.2.0] - 2025-11-02
 
 ### Added
@@ -60,7 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Authored README, CONTRIBUTING, and TESTING guides covering setup, development workflow, and debugging practices.
 
-[Unreleased]: https://github.com/dsuriano/tributary/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/dsuriano/tributary/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/dsuriano/tributary/releases/tag/v1.2.1
 [1.2.0]: https://github.com/dsuriano/tributary/releases/tag/v1.2.0
 [1.1.0]: https://github.com/dsuriano/tributary/releases/tag/v1.1.0
 [1.0.0]: https://github.com/dsuriano/tributary/releases/tag/v1.0.0
