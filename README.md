@@ -37,10 +37,13 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
 
 1.  **Download the Latest Release**
 
-    Grab the packaged build from the [Tributary releases page](https://github.com/dsuriano/tributary/releases/latest) and download the `tributary-extension.zip` asset.
+    Grab the packaged build from the [Tributary releases page](https://github.com/dsuriano/tributary/releases/latest). Two archives are published:
 
-    - Extract the archive somewhere convenient.
-    - Skip ahead to [Load Tributary in Chrome](#load-tributary-in-chrome) to install without building from source.
+    - `tributary-chrome.zip` — contains the Chrome/Chromium bundle.
+    - `tributary-firefox.zip` — contains the Firefox bundle ready for temporary installs or AMO submission.
+
+    Extract the archive for the browser you plan to install.
+    - Continue to [Load Tributary in Chrome](#load-tributary-in-chrome) or [Load Tributary in Firefox](#load-tributary-in-firefox).
 
 2.  **Clone the Repository** _(optional for development)_
 
@@ -84,7 +87,7 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
 - Open Google Chrome and navigate to `chrome://extensions/`.
 - Toggle **Developer mode** on in the top-right corner.
 - Click **Load unpacked** and choose the folder that matches how you obtained Tributary:
-  - If you downloaded `tributary-extension.zip`, select the extracted release folder.
+  - If you downloaded `tributary-chrome.zip`, select the extracted release folder.
   - If you built from source, select the locally generated `dist/chrome/` directory.
 - Tributary will appear in your list. Pin it to the toolbar for easy access.
 - If you are running the `dev` watcher, click the **Refresh** button on the Tributary card in `chrome://extensions/` to load your changes.
@@ -93,7 +96,7 @@ The internet is a torrent of information. Your social feeds are chaotic, fast-mo
 
 - Open Firefox and navigate to `about:debugging#/runtime/this-firefox`.
 - Click **Load Temporary Add-on…** and select the `manifest.json` file inside the folder that matches how you obtained Tributary:
-  - If you downloaded `tributary-extension.zip`, extract it and pick the `manifest.json` within the Firefox build folder.
+  - If you downloaded `tributary-firefox.zip`, extract it and pick the `manifest.json` within the Firefox build folder.
   - If you built from source, select `dist/firefox/manifest.json`.
 - Firefox will list Tributary under Temporary Extensions. Use **Reload** to pick up rebuilt assets when developing.
 
