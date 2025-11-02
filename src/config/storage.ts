@@ -1,39 +1,21 @@
 /**
- * Promise-based wrappers around chrome.storage.local API
+ * Promise-based wrappers around browser.storage.local API
  */
+import browser from 'webextension-polyfill';
 
-export function getFromStorage<T = Record<string, unknown>>(
+export async function getFromStorage<T = Record<string, unknown>>(
   keys: string | string[]
 ): Promise<T> {
-  return new Promise((resolve) => {
-    const lookup = Array.isArray(keys) ? keys : [keys];
-    chrome.storage.local.get(lookup, (result) => {
-      resolve(result as T);
-    });
-  });
+  const lookup = Array.isArray(keys) ? keys : [keys];
+  const result = await browser.storage.local.get(lookup);
+  return result as T;
 }
 
-export function setToStorage(values: Record<string, unknown>): Promise<void> {
-  return new Promise((resolve, reject) => {
-    chrome.storage.local.set(values, () => {
-      if (chrome.runtime.lastError) {
-        reject(chrome.runtime.lastError);
-      } else {
-        resolve();
-      }
-    });
-  });
+export async function setToStorage(values: Record<string, unknown>): Promise<void> {
+  await browser.storage.local.set(values);
 }
 
-export function removeFromStorage(keys: string | string[]): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const list = Array.isArray(keys) ? keys : [keys];
-    chrome.storage.local.remove(list, () => {
-      if (chrome.runtime.lastError) {
-        reject(chrome.runtime.lastError);
-      } else {
-        resolve();
-      }
-    });
-  });
+export async function removeFromStorage(keys: string | string[]): Promise<void> {
+  const list = Array.isArray(keys) ? keys : [keys];
+  await browser.storage.local.remove(list);
 }

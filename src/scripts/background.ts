@@ -1,3 +1,4 @@
+import browser from 'webextension-polyfill';
 import { CONFIG, STORAGE_KEYS, TIMING, UI_COPY } from '../config/constants.js';
 import { getFromStorage, removeFromStorage } from '../config/storage.js';
 
@@ -115,7 +116,7 @@ async function raindropFetch(
  */
 async function handleSave(
   data: { url: string; title?: string; excerpt?: string },
-  tab: chrome.tabs.Tab
+  tab: any
 ): Promise<void> {
   const stored = await getFromStorage<StorageData>([
     STORAGE_KEYS.TOKEN,
@@ -131,7 +132,7 @@ async function handleSave(
   
   if (!raindropToken) {
     if (tab.id) {
-      chrome.tabs.sendMessage(tab.id, {
+      await browser.tabs.sendMessage(tab.id, {
         type: 'saveResult',
         status: 'error',
         error: UI_COPY.TOKEN_NOT_SET
@@ -143,7 +144,7 @@ async function handleSave(
   const now = Date.now();
   if (now < backoffUntil) {
     if (tab.id) {
-      chrome.tabs.sendMessage(tab.id, {
+      await browser.tabs.sendMessage(tab.id, {
         type: 'saveResult',
         status: 'error',
         error: UI_COPY.RATE_LIMIT_ERROR
@@ -192,7 +193,7 @@ async function handleSave(
       // Too many requests – apply backoff
       backoffUntil = Date.now() + TIMING.RATE_LIMIT_BACKOFF_MS;
       if (tab.id) {
-        chrome.tabs.sendMessage(tab.id, {
+        await browser.tabs.sendMessage(tab.id, {
           type: 'saveResult',
           status: 'error',
           error: UI_COPY.RATE_LIMIT_ERROR
@@ -205,7 +206,7 @@ async function handleSave(
       // Invalid token
       await removeFromStorage(STORAGE_KEYS.TOKEN);
       if (tab.id) {
-        chrome.tabs.sendMessage(tab.id, {
+        await browser.tabs.sendMessage(tab.id, {
           type: 'saveResult',
           status: 'error',
           error: UI_COPY.TOKEN_INVALID
@@ -217,7 +218,7 @@ async function handleSave(
     if (!response.ok) {
       const text = await response.text().catch(() => '');
       if (tab.id) {
-        chrome.tabs.sendMessage(tab.id, {
+        await browser.tabs.sendMessage(tab.id, {
           type: 'saveResult',
           status: 'error',
           error: text || 'Failed to save bookmark.'
@@ -229,14 +230,14 @@ async function handleSave(
     const json = await response.json() as RaindropApiResponse;
     if (json?.result) {
       if (tab.id) {
-        chrome.tabs.sendMessage(tab.id, {
+        await browser.tabs.sendMessage(tab.id, {
           type: 'saveResult',
           status: 'success'
         } as SaveResultMessage);
       }
     } else {
       if (tab.id) {
-        chrome.tabs.sendMessage(tab.id, {
+        await browser.tabs.sendMessage(tab.id, {
           type: 'saveResult',
           status: 'error',
           error: 'Failed to save bookmark.'
@@ -245,7 +246,7 @@ async function handleSave(
     }
   } catch (err) {
     if (tab.id) {
-      chrome.tabs.sendMessage(tab.id, {
+      await browser.tabs.sendMessage(tab.id, {
         type: 'saveResult',
         status: 'error',
         error: 'Network error.'
@@ -259,15 +260,12 @@ async function handleSave(
  * separates root collections and children collections so both must
  * be queried. Returns a combined array of collection objects.
  */
-async function handleGetCollections(
-  sendResponse: (response: CollectionsResponse) => void
-): Promise<void> {
+async function handleGetCollections(): Promise<CollectionsResponse> {
   const stored = await getFromStorage<StorageData>([STORAGE_KEYS.TOKEN]);
   const raindropToken = stored[STORAGE_KEYS.TOKEN];
   
   if (!raindropToken) {
-    sendResponse({ error: UI_COPY.TOKEN_NOT_SET });
-    return;
+    return { error: UI_COPY.TOKEN_NOT_SET };
   }
   
   try {
@@ -278,8 +276,7 @@ async function handleGetCollections(
     const resRoot = await raindropFetch('/collections', { method: 'GET', headers }, raindropToken);
     if (resRoot.status === 401) {
       await removeFromStorage(STORAGE_KEYS.TOKEN);
-      sendResponse({ error: 'unauthorized' });
-      return;
+      return { error: 'unauthorized' };
     }
     if (resRoot.ok) {
       const data = await resRoot.json() as CollectionsApiResponse;
@@ -310,9 +307,9 @@ async function handleGetCollections(
       dedupedCollections.push(collection);
     }
     
-    sendResponse({ collections: dedupedCollections });
+    return { collections: dedupedCollections };
   } catch (err) {
-    sendResponse({ error: 'Network error.' });
+    return { error: 'Network error.' };
   }
 }
 
@@ -320,51 +317,44 @@ async function handleGetCollections(
  * Validate the stored API token by making a lightweight call to the
  * Raindrop API. The /user endpoint can be used to verify the token.
  */
-async function handleValidateToken(
-  sendResponse: (response: ValidationResponse) => void
-): Promise<void> {
+async function handleValidateToken(): Promise<ValidationResponse> {
   const stored = await getFromStorage<StorageData>([STORAGE_KEYS.TOKEN]);
   const raindropToken = stored[STORAGE_KEYS.TOKEN];
   
   if (!raindropToken) {
-    sendResponse({ valid: false });
-    return;
+    return { valid: false };
   }
   
   try {
     const res = await raindropFetch('/user', { method: 'GET' }, raindropToken);
     if (res.status === 401) {
       await removeFromStorage(STORAGE_KEYS.TOKEN);
-      sendResponse({ valid: false });
+      return { valid: false };
     } else {
-      sendResponse({ valid: res.ok });
+      return { valid: res.ok };
     }
   } catch (err) {
-    sendResponse({ valid: false });
+    return { valid: false };
   }
 }
 
 // Listener for messages from content scripts and options page
-chrome.runtime.onMessage.addListener((
+browser.runtime.onMessage.addListener(async (
   message: Message,
-  sender: chrome.runtime.MessageSender,
-  sendResponse: (response?: unknown) => void
-): boolean | void => {
+  sender: browser.runtime.MessageSender
+): Promise<unknown | void> => {
   if (!message || typeof message !== 'object') return;
-  
   switch (message.action) {
     case 'save':
       if (sender.tab && 'data' in message) {
-        handleSave(message.data, sender.tab);
+        await handleSave(message.data, sender.tab);
       }
-      break;
+      return; // no response payload
     case 'getCollections':
-      handleGetCollections(sendResponse as (response: CollectionsResponse) => void);
-      return true; // keep channel open for async response
+      return await handleGetCollections();
     case 'validateToken':
-      handleValidateToken(sendResponse as (response: ValidationResponse) => void);
-      return true;
+      return await handleValidateToken();
     default:
-      break;
+      return;
   }
 });

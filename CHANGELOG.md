@@ -9,15 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Nothing yet.
+- Firefox build target with manifest transforms to support temporary add-ons and Gecko-specific background scripts.
 
 ### Changed
 
-- Nothing yet.
+- CI build verification now checks per-target output directories for Chrome and Firefox bundles.
+- Playwright E2E fixtures accept an `EXTENSION_TARGET` environment variable so tests can run against either bundle.
 
 ### Fixed
 
-- Nothing yet.
+- Documentation updated with Firefox requirements, load instructions, and test commands.
 
 ## [1.1.0] - 2025-10-14
 

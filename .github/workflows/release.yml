@@ -27,16 +27,22 @@ jobs:
       - name: Build extension
         run: npm run build
 
-      - name: Package extension for release
+      - name: Package Chrome build
         run: |
-          cd dist
-          zip -r ../tributary-extension.zip .
-          cd ..
+          cd dist/chrome
+          zip -r ../../tributary-chrome.zip .
+
+      - name: Package Firefox build
+        run: |
+          cd dist/firefox
+          zip -r ../../tributary-firefox.zip .
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: tributary-extension.zip
+          files: |
+            tributary-chrome.zip
+            tributary-firefox.zip
           body: 'See the [CHANGELOG.md](CHANGELOG.md) for details.'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

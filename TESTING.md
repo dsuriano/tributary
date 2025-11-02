@@ -87,6 +87,9 @@ npx playwright install chromium
 # Run E2E tests
 npm run test:e2e
 
+# Run E2E tests against a specific bundle (default: chrome)
+EXTENSION_TARGET=firefox npm run test:e2e
+
 # Run E2E tests with UI (recommended for debugging)
 npm run test:e2e:ui
 ```

@@ -9,165 +9,96 @@ describe('Storage Utilities', () => {
 
   describe('getFromStorage', () => {
     test('should retrieve single key', async () => {
-      chrome.storage.local.get.mockImplementation((keys, callback) => {
-        callback({ raindropToken: 'test-token' });
-      });
+      const spy = vi.spyOn(browser.storage.local, 'get').mockResolvedValue({ raindropToken: 'test-token' });
 
       const result = await getFromStorage('raindropToken');
-      
-      expect(chrome.storage.local.get).toHaveBeenCalledWith(['raindropToken'], expect.any(Function));
+      expect(spy).toHaveBeenCalledWith(['raindropToken']);
       expect(result.raindropToken).toBe('test-token');
     });
 
     test('should retrieve multiple keys', async () => {
-      chrome.storage.local.get.mockImplementation((keys, callback) => {
-        callback({
-          raindropToken: 'test-token',
-          defaultCollection: 12345,
-        });
+      const spy = vi.spyOn(browser.storage.local, 'get').mockResolvedValue({
+        raindropToken: 'test-token',
+        defaultCollection: 12345,
       });
 
       const result = await getFromStorage(['raindropToken', 'defaultCollection']);
-      
-      expect(chrome.storage.local.get).toHaveBeenCalledWith(
-        ['raindropToken', 'defaultCollection'],
-        expect.any(Function)
-      );
+      expect(spy).toHaveBeenCalledWith(['raindropToken', 'defaultCollection']);
       expect(result.raindropToken).toBe('test-token');
       expect(result.defaultCollection).toBe(12345);
     });
 
     test('should handle missing keys', async () => {
-      chrome.storage.local.get.mockImplementation((keys, callback) => {
-        callback({});
-      });
-
+      vi.spyOn(browser.storage.local, 'get').mockResolvedValue({});
       const result = await getFromStorage('nonexistent');
-      
       expect(result).toEqual({});
     });
 
     test('should convert single key to array', async () => {
-      chrome.storage.local.get.mockImplementation((keys, callback) => {
-        expect(Array.isArray(keys)).toBe(true);
-        callback({});
-      });
-
+      const spy = vi.spyOn(browser.storage.local, 'get').mockResolvedValue({});
       await getFromStorage('singleKey');
-      
-      expect(chrome.storage.local.get).toHaveBeenCalledWith(['singleKey'], expect.any(Function));
+      expect(spy).toHaveBeenCalledWith(['singleKey']);
     });
   });
 
   describe('setToStorage', () => {
     test('should save single value', async () => {
-      chrome.storage.local.set.mockImplementation((items, callback) => {
-        callback();
-      });
-
+      const spy = vi.spyOn(browser.storage.local, 'set').mockResolvedValue();
       await setToStorage({ raindropToken: 'new-token' });
-      
-      expect(chrome.storage.local.set).toHaveBeenCalledWith(
-        { raindropToken: 'new-token' },
-        expect.any(Function)
-      );
+      expect(spy).toHaveBeenCalledWith({ raindropToken: 'new-token' });
     });
 
     test('should save multiple values', async () => {
-      chrome.storage.local.set.mockImplementation((items, callback) => {
-        callback();
-      });
-
+      const spy = vi.spyOn(browser.storage.local, 'set').mockResolvedValue();
       await setToStorage({
         raindropToken: 'new-token',
         defaultCollection: 12345,
         defaultTags: ['tag1', 'tag2'],
       });
-      
-      expect(chrome.storage.local.set).toHaveBeenCalledWith(
-        expect.objectContaining({
-          raindropToken: 'new-token',
-          defaultCollection: 12345,
-          defaultTags: ['tag1', 'tag2'],
-        }),
-        expect.any(Function)
-      );
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({
+        raindropToken: 'new-token',
+        defaultCollection: 12345,
+        defaultTags: ['tag1', 'tag2'],
+      }));
     });
 
     test('should reject on error', async () => {
-      chrome.storage.local.set.mockImplementation((items, callback) => {
-        chrome.runtime.lastError = { message: 'Storage quota exceeded' };
-        callback();
-      });
-
-      await expect(setToStorage({ key: 'value' })).rejects.toEqual({
-        message: 'Storage quota exceeded',
-      });
+      vi.spyOn(browser.storage.local, 'set').mockRejectedValue({ message: 'Storage quota exceeded' });
+      await expect(setToStorage({ key: 'value' })).rejects.toEqual({ message: 'Storage quota exceeded' });
     });
 
     test('should resolve on success', async () => {
-      chrome.storage.local.set.mockImplementation((items, callback) => {
-        callback();
-      });
-
+      vi.spyOn(browser.storage.local, 'set').mockResolvedValue();
       await expect(setToStorage({ key: 'value' })).resolves.toBeUndefined();
     });
   });
 
   describe('removeFromStorage', () => {
     test('should remove single key', async () => {
-      chrome.storage.local.remove.mockImplementation((keys, callback) => {
-        callback();
-      });
-
+      const spy = vi.spyOn(browser.storage.local, 'remove').mockResolvedValue();
       await removeFromStorage('raindropToken');
-      
-      expect(chrome.storage.local.remove).toHaveBeenCalledWith(
-        ['raindropToken'],
-        expect.any(Function)
-      );
+      expect(spy).toHaveBeenCalledWith(['raindropToken']);
     });
 
     test('should remove multiple keys', async () => {
-      chrome.storage.local.remove.mockImplementation((keys, callback) => {
-        callback();
-      });
-
+      const spy = vi.spyOn(browser.storage.local, 'remove').mockResolvedValue();
       await removeFromStorage(['raindropToken', 'defaultCollection']);
-      
-      expect(chrome.storage.local.remove).toHaveBeenCalledWith(
-        ['raindropToken', 'defaultCollection'],
-        expect.any(Function)
-      );
+      expect(spy).toHaveBeenCalledWith(['raindropToken', 'defaultCollection']);
     });
 
     test('should convert single key to array', async () => {
-      chrome.storage.local.remove.mockImplementation((keys, callback) => {
-        expect(Array.isArray(keys)).toBe(true);
-        callback();
-      });
-
+      const spy = vi.spyOn(browser.storage.local, 'remove').mockResolvedValue();
       await removeFromStorage('singleKey');
-      
-      expect(chrome.storage.local.remove).toHaveBeenCalledWith(['singleKey'], expect.any(Function));
+      expect(spy).toHaveBeenCalledWith(['singleKey']);
     });
 
     test('should reject on error', async () => {
-      chrome.storage.local.remove.mockImplementation((keys, callback) => {
-        chrome.runtime.lastError = { message: 'Storage error' };
-        callback();
-      });
-
-      await expect(removeFromStorage('key')).rejects.toEqual({
-        message: 'Storage error',
-      });
+      vi.spyOn(browser.storage.local, 'remove').mockRejectedValue({ message: 'Storage error' });
+      await expect(removeFromStorage('key')).rejects.toEqual({ message: 'Storage error' });
     });
 
     test('should resolve on success', async () => {
-      chrome.storage.local.remove.mockImplementation((keys, callback) => {
-        callback();
-      });
-
+      vi.spyOn(browser.storage.local, 'remove').mockResolvedValue();
       await expect(removeFromStorage('key')).resolves.toBeUndefined();
     });
   });

@@ -1,3 +1,4 @@
+import browser from 'webextension-polyfill';
 import type { SiteConfig, ProviderEntry } from './types.js';
 
 /**
@@ -28,24 +29,24 @@ function hostnameMatches(match: string, hostname: string): boolean {
  * 
  * Add new providers here by appending an object with:
  * - match: array of hostnames or wildcard patterns (e.g., "example.com", "*.sub.example.com")
- * - loader: function that dynamically imports the provider module via chrome.runtime.getURL
+ * - loader: function that dynamically imports the provider module via browser.runtime.getURL
  * 
  * Example:
  * {
  *   match: ['example.com', 'news.example.com', '*.blog.example.com'],
- *   loader: () => import(chrome.runtime.getURL('scripts/sites/example.js'))
+ *   loader: () => import(browser.runtime.getURL('scripts/sites/example.js'))
  * }
  * 
  * Tip: Wildcards are supported via hostnameMatches() ("*.domain.tld" matches the apex and any subdomain).
  */
 const providers: ProviderEntry[] = [
-  { match: ['twitter.com', 'x.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/twitter.js')) },
-  { match: ['youtube.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/youtube.js')) },
-  { match: ['reddit.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/reddit.js')) },
-  { match: ['github.com'], loader: () => import(chrome.runtime.getURL('scripts/sites/github.js')) },
+  { match: ['twitter.com', 'x.com'], loader: () => import(browser.runtime.getURL('scripts/sites/twitter.js')) },
+  { match: ['youtube.com'], loader: () => import(browser.runtime.getURL('scripts/sites/youtube.js')) },
+  { match: ['reddit.com'], loader: () => import(browser.runtime.getURL('scripts/sites/reddit.js')) },
+  { match: ['github.com'], loader: () => import(browser.runtime.getURL('scripts/sites/github.js')) },
 ];
 
-const genericLoader = () => import(chrome.runtime.getURL('scripts/sites/generic.js'));
+const genericLoader = () => import(browser.runtime.getURL('scripts/sites/generic.js'));
 
 /**
  * Load the site configuration for a given hostname
