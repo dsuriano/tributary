@@ -1,6 +1,6 @@
 {
   "name": "tributary",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Tributary: The effortless archive for Raindrop.io.",
   "type": "module",
   "scripts": {
